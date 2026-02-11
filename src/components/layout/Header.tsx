@@ -6,7 +6,7 @@ export default function Header({ onMenuToggle }: { onMenuToggle: () => void }) {
   const { data: session } = useSession();
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
       <button
         onClick={onMenuToggle}
         className="lg:hidden p-2 rounded-md hover:bg-gray-100"
@@ -19,12 +19,12 @@ export default function Header({ onMenuToggle }: { onMenuToggle: () => void }) {
       <div className="flex-1 lg:flex-none" />
 
       <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-600">
+        <span className="text-base text-gray-600">
           {session?.user?.name}
         </span>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="text-sm text-red-600 hover:text-red-700 font-medium"
+          className="text-base text-red-600 hover:text-red-700 font-medium"
         >
           Keluar
         </button>

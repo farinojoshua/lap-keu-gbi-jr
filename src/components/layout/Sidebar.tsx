@@ -36,11 +36,11 @@ export default function Sidebar({
         }`}
       >
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-lg font-bold text-gray-800">GBI Jonggol Raya</h1>
-          <p className="text-xs text-gray-500">Laporan Keuangan</p>
+          <h1 className="text-xl font-bold text-gray-800">GBI Jonggol Raya</h1>
+          <p className="text-sm text-gray-500">Laporan Keuangan</p>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-2">
           {navItems.map((item) => {
             const isActive =
               item.href === "/"
@@ -51,13 +51,13 @@ export default function Sidebar({
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                   isActive
                     ? "bg-blue-50 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                <span className="text-lg">{item.icon}</span>
+                <span className="text-xl">{item.icon}</span>
                 {item.label}
               </Link>
             );

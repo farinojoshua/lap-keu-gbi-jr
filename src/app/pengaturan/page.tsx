@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { formatRupiah } from "@/lib/utils";
+import { showSuccess, showError, showConfirmDelete } from "@/lib/swal";
+import NumericInput from "@/components/ui/NumericInput";
 
 interface Template {
   id: string;
@@ -89,7 +91,7 @@ export default function PengaturanPage() {
       }),
     });
     setChurchSaving(false);
-    alert("Info gereja berhasil disimpan!");
+    showSuccess("Info gereja berhasil disimpan");
   }
 
   async function addTemplate() {
@@ -108,12 +110,15 @@ export default function PengaturanPage() {
     setNewTplAmount("");
     const tpl = await fetch("/api/expense/templates").then((r) => r.json());
     setTemplates(tpl);
+    showSuccess("Template berhasil ditambahkan");
   }
 
   async function deleteTemplate(id: string) {
-    if (!confirm("Hapus template ini?")) return;
+    const result = await showConfirmDelete();
+    if (!result.isConfirmed) return;
     await fetch(`/api/expense/templates?id=${id}`, { method: "DELETE" });
     setTemplates((prev) => prev.filter((t) => t.id !== id));
+    showSuccess("Template berhasil dihapus");
   }
 
   async function addKomsel() {
@@ -126,12 +131,15 @@ export default function PengaturanPage() {
     setNewKomselName("");
     const groups = await fetch("/api/settings/komsel").then((r) => r.json());
     setKomselGroups(groups);
+    showSuccess("Komsel berhasil ditambahkan");
   }
 
   async function deleteKomsel(id: string) {
-    if (!confirm("Hapus komsel ini?")) return;
+    const result = await showConfirmDelete();
+    if (!result.isConfirmed) return;
     await fetch(`/api/settings/komsel?id=${id}`, { method: "DELETE" });
     setKomselGroups((prev) => prev.filter((g) => g.id !== id));
+    showSuccess("Komsel berhasil dihapus");
   }
 
   async function addUser() {
@@ -148,7 +156,7 @@ export default function PengaturanPage() {
     });
     const data = await res.json();
     if (data.error) {
-      alert(data.error);
+      showError(data.error);
       return;
     }
     setNewUsername("");
@@ -156,17 +164,20 @@ export default function PengaturanPage() {
     setNewName("");
     const userList = await fetch("/api/settings/users").then((r) => r.json());
     setUsers(userList);
+    showSuccess("User berhasil ditambahkan");
   }
 
   async function deleteUser(id: string) {
-    if (!confirm("Hapus user ini?")) return;
+    const result = await showConfirmDelete("User yang dihapus tidak bisa dikembalikan.");
+    if (!result.isConfirmed) return;
     const res = await fetch(`/api/settings/users?id=${id}`, { method: "DELETE" });
     const data = await res.json();
     if (data.error) {
-      alert(data.error);
+      showError(data.error);
       return;
     }
     setUsers((prev) => prev.filter((u) => u.id !== id));
+    showSuccess("User berhasil dihapus");
   }
 
   async function setSaldoAwal() {
@@ -183,7 +194,7 @@ export default function PengaturanPage() {
         saldoPindahan: Number(saldoAmount),
       }),
     });
-    alert(`Saldo pindahan ${saldoMonth}/${saldoYear} berhasil di-set: ${formatRupiah(Number(saldoAmount))}`);
+    showSuccess(`Saldo pindahan berhasil di-set: ${formatRupiah(Number(saldoAmount))}`);
   }
 
   const tabs: { key: Tab; label: string }[] = [
@@ -206,7 +217,7 @@ export default function PengaturanPage() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`px-5 py-3.5 text-base font-medium whitespace-nowrap border-b-2 transition-colors ${
                   activeTab === tab.key
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
@@ -223,18 +234,18 @@ export default function PengaturanPage() {
           {activeTab === "church" && (
             <div className="space-y-4 max-w-lg">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Gereja</label>
-                <input type="text" value={churchName} onChange={(e) => setChurchName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+                <label className="block text-base font-medium text-gray-700 mb-1">Nama Gereja</label>
+                <input type="text" value={churchName} onChange={(e) => setChurchName(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Gembala</label>
-                <input type="text" value={pastorName} onChange={(e) => setPastorName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+                <label className="block text-base font-medium text-gray-700 mb-1">Nama Gembala</label>
+                <input type="text" value={pastorName} onChange={(e) => setPastorName(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Bendahara</label>
-                <input type="text" value={treasurerName} onChange={(e) => setTreasurerName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+                <label className="block text-base font-medium text-gray-700 mb-1">Nama Bendahara</label>
+                <input type="text" value={treasurerName} onChange={(e) => setTreasurerName(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
               </div>
-              <button onClick={saveChurchInfo} disabled={churchSaving} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <button onClick={saveChurchInfo} disabled={churchSaving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
                 {churchSaving ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
@@ -260,7 +271,7 @@ export default function PengaturanPage() {
                         <td className="px-3 py-2">{t.description}</td>
                         <td className="px-3 py-2 text-right">{formatRupiah(t.defaultAmount)}</td>
                         <td className="px-3 py-2 text-center">
-                          <button onClick={() => deleteTemplate(t.id)} className="text-red-600 hover:underline text-xs">Hapus</button>
+                          <button onClick={() => deleteTemplate(t.id)} className="text-red-600 hover:underline text-sm">Hapus</button>
                         </td>
                       </tr>
                     ))}
@@ -268,12 +279,12 @@ export default function PengaturanPage() {
                 </table>
               </div>
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Tambah Template:</p>
+                <p className="text-base font-medium text-gray-700 mb-2">Tambah Template:</p>
                 <div className="flex gap-2 flex-wrap items-end">
-                  <input type="text" value={newTplCategory} onChange={(e) => setNewTplCategory(e.target.value)} placeholder="Kategori" className="border rounded-md px-3 py-2 text-sm w-40" />
-                  <input type="text" value={newTplDesc} onChange={(e) => setNewTplDesc(e.target.value)} placeholder="Keterangan" className="border rounded-md px-3 py-2 text-sm flex-1 min-w-[200px]" />
-                  <input type="number" value={newTplAmount} onChange={(e) => setNewTplAmount(e.target.value)} placeholder="Jumlah" className="border rounded-md px-3 py-2 text-sm w-32" />
-                  <button onClick={addTemplate} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">Tambah</button>
+                  <input type="text" value={newTplCategory} onChange={(e) => setNewTplCategory(e.target.value)} placeholder="Kategori" className="border rounded-md px-4 py-2.5 text-base w-40" />
+                  <input type="text" value={newTplDesc} onChange={(e) => setNewTplDesc(e.target.value)} placeholder="Keterangan" className="border rounded-md px-4 py-2.5 text-base flex-1 min-w-[200px]" />
+                  <NumericInput value={newTplAmount} onChange={setNewTplAmount} placeholder="Jumlah" className="border rounded-md px-4 py-2.5 text-base w-32" />
+                  <button onClick={addTemplate} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 text-base">Tambah</button>
                 </div>
               </div>
             </div>
@@ -285,8 +296,8 @@ export default function PengaturanPage() {
               <div className="space-y-2">
                 {komselGroups.map((g) => (
                   <div key={g.id} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-md">
-                    <span className="text-sm">{g.name}</span>
-                    <button onClick={() => deleteKomsel(g.id)} className="text-red-600 hover:underline text-xs">Hapus</button>
+                    <span className="text-base">{g.name}</span>
+                    <button onClick={() => deleteKomsel(g.id)} className="text-red-600 hover:underline text-sm">Hapus</button>
                   </div>
                 ))}
               </div>
@@ -296,10 +307,10 @@ export default function PengaturanPage() {
                   value={newKomselName}
                   onChange={(e) => setNewKomselName(e.target.value)}
                   placeholder="Nama Komsel"
-                  className="border rounded-md px-3 py-2 text-sm flex-1"
+                  className="border rounded-md px-4 py-2.5 text-base flex-1"
                   onKeyDown={(e) => e.key === "Enter" && addKomsel()}
                 />
-                <button onClick={addKomsel} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">Tambah</button>
+                <button onClick={addKomsel} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 text-base">Tambah</button>
               </div>
             </div>
           )}
@@ -323,12 +334,12 @@ export default function PengaturanPage() {
                         <td className="px-3 py-2">{u.username}</td>
                         <td className="px-3 py-2">{u.name}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-2 py-0.5 rounded text-xs ${u.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                          <span className={`px-2.5 py-1 rounded text-sm ${u.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
                             {u.role}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:underline text-xs">Hapus</button>
+                          <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:underline text-sm">Hapus</button>
                         </td>
                       </tr>
                     ))}
@@ -336,16 +347,16 @@ export default function PengaturanPage() {
                 </table>
               </div>
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Tambah User:</p>
+                <p className="text-base font-medium text-gray-700 mb-2">Tambah User:</p>
                 <div className="flex gap-2 flex-wrap items-end">
-                  <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="Username" className="border rounded-md px-3 py-2 text-sm w-36" />
-                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Password" className="border rounded-md px-3 py-2 text-sm w-36" />
-                  <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nama Lengkap" className="border rounded-md px-3 py-2 text-sm w-48" />
-                  <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="border rounded-md px-3 py-2 text-sm">
+                  <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="Username" className="border rounded-md px-4 py-2.5 text-base w-36" />
+                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Password" className="border rounded-md px-4 py-2.5 text-base w-36" />
+                  <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nama Lengkap" className="border rounded-md px-4 py-2.5 text-base w-48" />
+                  <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="border rounded-md px-4 py-2.5 text-base">
                     <option value="bendahara">Bendahara</option>
                     <option value="admin">Admin</option>
                   </select>
-                  <button onClick={addUser} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">Tambah</button>
+                  <button onClick={addUser} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 text-base">Tambah</button>
                 </div>
               </div>
             </div>
@@ -354,21 +365,21 @@ export default function PengaturanPage() {
           {/* Saldo Awal */}
           {activeTab === "saldo" && (
             <div className="space-y-4 max-w-md">
-              <p className="text-sm text-gray-600">
+              <p className="text-base text-gray-600">
                 Set saldo pindahan awal untuk memulai pencatatan. Ini biasanya digunakan untuk bulan pertama saat setup aplikasi.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bulan</label>
-                  <select value={saldoMonth} onChange={(e) => setSaldoMonth(Number(e.target.value))} className="w-full border rounded-md px-3 py-2 text-sm">
+                  <label className="block text-base font-medium text-gray-700 mb-1">Bulan</label>
+                  <select value={saldoMonth} onChange={(e) => setSaldoMonth(Number(e.target.value))} className="w-full border rounded-md px-4 py-2.5 text-base">
                     {Array.from({ length: 12 }, (_, i) => (
                       <option key={i + 1} value={i + 1}>{i + 1}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
-                  <select value={saldoYear} onChange={(e) => setSaldoYear(Number(e.target.value))} className="w-full border rounded-md px-3 py-2 text-sm">
+                  <label className="block text-base font-medium text-gray-700 mb-1">Tahun</label>
+                  <select value={saldoYear} onChange={(e) => setSaldoYear(Number(e.target.value))} className="w-full border rounded-md px-4 py-2.5 text-base">
                     {[2024, 2025, 2026, 2027].map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
@@ -376,10 +387,10 @@ export default function PengaturanPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Saldo Pindahan (Rp)</label>
-                <input type="number" value={saldoAmount} onChange={(e) => setSaldoAmount(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="0" />
+                <label className="block text-base font-medium text-gray-700 mb-1">Saldo Pindahan (Rp)</label>
+                <NumericInput value={saldoAmount} onChange={setSaldoAmount} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
               </div>
-              <button onClick={setSaldoAwal} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">
+              <button onClick={setSaldoAwal} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 text-base">
                 Set Saldo Awal
               </button>
             </div>

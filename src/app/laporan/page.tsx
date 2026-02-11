@@ -10,10 +10,12 @@ import {
   EXPENSE_CATEGORIES,
   FUND_TYPES,
 } from "@/lib/utils";
+import { showSuccess, showConfirmAction } from "@/lib/swal";
+import NumericInput from "@/components/ui/NumericInput";
 
 const PDFExportButton = dynamic(() => import("@/components/report/PDFExportButton"), {
   ssr: false,
-  loading: () => <button disabled className="bg-red-600 text-white px-4 py-1.5 rounded-md opacity-50 text-sm">Menyiapkan...</button>,
+  loading: () => <button disabled className="bg-red-600 text-white px-5 py-2.5 rounded-md opacity-50 text-base">Menyiapkan...</button>,
 });
 
 interface ReportData {
@@ -86,7 +88,12 @@ export default function LaporanPage() {
   }, [loadData]);
 
   async function handleClosePeriod() {
-    if (!data || !confirm(`Tutup periode ${getMonthName(month)} ${year}? Saldo akan dipindahkan ke bulan berikutnya.`)) return;
+    if (!data) return;
+    const result = await showConfirmAction(
+      `Tutup Periode ${getMonthName(month)} ${year}?`,
+      "Saldo akan dipindahkan ke bulan berikutnya. Periode yang sudah ditutup tidak bisa diubah lagi."
+    );
+    if (!result.isConfirmed) return;
     setClosing(true);
     await fetch("/api/periods/close", {
       method: "POST",
@@ -95,6 +102,7 @@ export default function LaporanPage() {
     });
     setClosing(false);
     loadData();
+    showSuccess("Periode berhasil ditutup");
   }
 
   async function handleSaveSaldo() {
@@ -126,6 +134,7 @@ export default function LaporanPage() {
 
     setEditSaldo(false);
     loadData();
+    showSuccess("Keterangan berhasil disimpan");
   }
 
   if (loading) {
@@ -145,12 +154,12 @@ export default function LaporanPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">Laporan Bulanan</h1>
         <div className="flex gap-2 items-center flex-wrap">
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border rounded-md px-3 py-1.5 text-sm">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border rounded-md px-4 py-2.5 text-base">
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
             ))}
           </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border rounded-md px-3 py-1.5 text-sm">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border rounded-md px-4 py-2.5 text-base">
             {[2024, 2025, 2026, 2027].map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
@@ -162,7 +171,7 @@ export default function LaporanPage() {
             <button
               onClick={handleClosePeriod}
               disabled={closing}
-              className="bg-orange-600 text-white px-4 py-1.5 rounded-md hover:bg-orange-700 disabled:opacity-50 text-sm"
+              className="bg-orange-600 text-white px-5 py-2.5 rounded-md hover:bg-orange-700 disabled:opacity-50 text-base"
             >
               {closing ? "Menutup..." : "Tutup Periode"}
             </button>
@@ -171,7 +180,7 @@ export default function LaporanPage() {
       </div>
 
       {data.period.isLocked && (
-        <div className="bg-green-50 text-green-700 p-3 rounded-md text-sm">
+        <div className="bg-green-50 text-green-700 p-3 rounded-md text-base">
           Periode ini sudah ditutup dan dikunci.
         </div>
       )}
@@ -303,13 +312,13 @@ export default function LaporanPage() {
               {!data.period.isLocked && (
                 <button
                   onClick={() => (editSaldo ? handleSaveSaldo() : setEditSaldo(true))}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-base text-blue-600 hover:underline"
                 >
                   {editSaldo ? "Simpan" : "Edit"}
                 </button>
               )}
             </div>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-base">
               <div className="flex justify-between py-1 border-b">
                 <span>Kas Tersedia</span>
                 <span className="font-semibold">{formatRupiah(data.saldo)}</span>
@@ -317,11 +326,10 @@ export default function LaporanPage() {
               <div className="flex justify-between py-1 border-b items-center">
                 <span>Saldo Rekening</span>
                 {editSaldo ? (
-                  <input
-                    type="number"
+                  <NumericInput
                     value={saldoRekening}
-                    onChange={(e) => setSaldoRekening(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm w-40 text-right"
+                    onChange={setSaldoRekening}
+                    className="border rounded px-3 py-1.5 text-base w-44 text-right"
                   />
                 ) : (
                   <span>{formatRupiah(data.period.saldoRekening)}</span>
@@ -330,11 +338,10 @@ export default function LaporanPage() {
               <div className="flex justify-between py-1 border-b items-center">
                 <span>Saldo Cash</span>
                 {editSaldo ? (
-                  <input
-                    type="number"
+                  <NumericInput
                     value={saldoCash}
-                    onChange={(e) => setSaldoCash(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm w-40 text-right"
+                    onChange={setSaldoCash}
+                    className="border rounded px-3 py-1.5 text-base w-44 text-right"
                   />
                 ) : (
                   <span>{formatRupiah(data.period.saldoCash)}</span>
@@ -344,11 +351,10 @@ export default function LaporanPage() {
                 <div key={key} className="flex justify-between py-1 border-b items-center">
                   <span>{label}</span>
                   {editSaldo ? (
-                    <input
-                      type="number"
+                    <NumericInput
                       value={fundEdits[key] || "0"}
-                      onChange={(e) => setFundEdits((prev) => ({ ...prev, [key]: e.target.value }))}
-                      className="border rounded px-2 py-1 text-sm w-40 text-right"
+                      onChange={(val) => setFundEdits((prev) => ({ ...prev, [key]: val }))}
+                      className="border rounded px-3 py-1.5 text-base w-44 text-right"
                     />
                   ) : (
                     <span>{formatRupiah(data.fundBalances[key] || 0)}</span>
@@ -359,14 +365,14 @@ export default function LaporanPage() {
           </div>
 
           {/* SIGNATURES */}
-          <div className="grid grid-cols-2 gap-8 mt-8 text-center text-sm">
+          <div className="grid grid-cols-2 gap-8 mt-8 text-center text-base">
             <div>
               <p className="text-gray-600">Gembala Sidang,</p>
               <div className="h-20" />
               <p className="font-bold border-t border-gray-300 pt-2 inline-block px-4">
                 {data.churchInfo.pastor_name || "________________"}
               </p>
-              <p className="text-xs text-gray-500">Gembala</p>
+              <p className="text-sm text-gray-500">Gembala</p>
             </div>
             <div>
               <p className="text-gray-600">Bendahara,</p>
@@ -374,7 +380,7 @@ export default function LaporanPage() {
               <p className="font-bold border-t border-gray-300 pt-2 inline-block px-4">
                 {data.churchInfo.treasurer_name || "________________"}
               </p>
-              <p className="text-xs text-gray-500">Bendahara</p>
+              <p className="text-sm text-gray-500">Bendahara</p>
             </div>
           </div>
         </div>

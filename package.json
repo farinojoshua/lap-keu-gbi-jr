@@ -22,7 +22,8 @@
     "next-auth": "^4.24.13",
     "prisma": "^5.22.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "sweetalert2": "^11.26.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

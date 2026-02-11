@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { formatRupiah, getMonthName, EXPENSE_CATEGORIES } from "@/lib/utils";
+import { showSuccess, showConfirmDelete } from "@/lib/swal";
+import NumericInput from "@/components/ui/NumericInput";
 
 interface ExpenseEntry {
   id: string;
@@ -138,6 +140,7 @@ export default function PengeluaranPage() {
     setWeeklyItems([]);
     setSaving(false);
     loadData();
+    showSuccess("Pengeluaran mingguan berhasil disimpan");
   }
 
   async function handleManualSubmit(e: React.FormEvent) {
@@ -163,12 +166,16 @@ export default function PengeluaranPage() {
     setManualAmount("");
     setSaving(false);
     loadData();
+    showSuccess("Pengeluaran berhasil disimpan");
   }
 
   async function handleDelete(id: string) {
-    if (isLocked || !confirm("Hapus data ini?")) return;
+    if (isLocked) return;
+    const result = await showConfirmDelete();
+    if (!result.isConfirmed) return;
     await fetch(`/api/expense?id=${id}`, { method: "DELETE" });
     loadData();
+    showSuccess("Data berhasil dihapus");
   }
 
   async function handleEditSave() {
@@ -187,6 +194,7 @@ export default function PengeluaranPage() {
     setEditingId(null);
     setSaving(false);
     loadData();
+    showSuccess("Data berhasil diperbarui");
   }
 
   function startEdit(entry: ExpenseEntry) {
@@ -198,17 +206,21 @@ export default function PengeluaranPage() {
 
   const totalExpense = entries.reduce((s, e) => s + e.amount, 0);
 
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const dateMin = `${year}-${String(month).padStart(2, "0")}-01`;
+  const dateMax = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">Pengeluaran</h1>
         <div className="flex gap-2 items-center">
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border rounded-md px-3 py-1.5 text-sm">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border rounded-md px-4 py-2.5 text-base">
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
             ))}
           </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border rounded-md px-3 py-1.5 text-sm">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border rounded-md px-4 py-2.5 text-base">
             {[2024, 2025, 2026, 2027].map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
@@ -217,7 +229,7 @@ export default function PengeluaranPage() {
       </div>
 
       {isLocked && (
-        <div className="bg-yellow-50 text-yellow-700 p-3 rounded-md text-sm">
+        <div className="bg-yellow-50 text-yellow-700 p-3 rounded-md text-base">
           Periode ini sudah ditutup. Data tidak bisa diubah.
         </div>
       )}
@@ -228,7 +240,7 @@ export default function PengeluaranPage() {
           {!showWeeklyForm ? (
             <button
               onClick={initWeeklyForm}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm"
+              className="bg-green-600 text-white px-5 py-2.5 rounded-md hover:bg-green-700 text-base"
             >
               + Tambah Pengeluaran Mingguan
             </button>
@@ -237,27 +249,26 @@ export default function PengeluaranPage() {
               <h3 className="font-semibold text-gray-800 mb-4">Pengeluaran Mingguan</h3>
               <form onSubmit={handleWeeklySubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Minggu</label>
-                  <input type="date" required value={weeklyDate} onChange={(e) => setWeeklyDate(e.target.value)} className="border rounded-md px-3 py-2 text-sm" />
+                  <label className="block text-base font-medium text-gray-700 mb-1">Tanggal Minggu</label>
+                  <input type="date" required min={dateMin} max={dateMax} value={weeklyDate} onChange={(e) => setWeeklyDate(e.target.value)} className="border rounded-md px-4 py-2.5 text-base" />
                 </div>
 
                 <div className="space-y-2">
                   {weeklyItems.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-md">
-                      <span className="flex-1 text-sm text-gray-700">{item.description}</span>
+                      <span className="flex-1 text-base text-gray-700">{item.description}</span>
                       <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-500">Rp</span>
-                        <input
-                          type="number"
-                          value={item.amount}
-                          onChange={(e) => updateWeeklyItem(idx, Number(e.target.value))}
-                          className="border rounded px-2 py-1 text-sm w-32 text-right"
+                        <span className="text-base text-gray-500">Rp</span>
+                        <NumericInput
+                          value={String(item.amount || "")}
+                          onChange={(val) => updateWeeklyItem(idx, Number(val))}
+                          className="border rounded px-3 py-1.5 text-base w-36 text-right"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={() => setWeeklyItems((prev) => prev.filter((_, i) => i !== idx))}
-                        className="text-red-500 hover:text-red-700 text-xs"
+                        className="text-red-500 hover:text-red-700 text-sm"
                       >
                         Hapus
                       </button>
@@ -267,33 +278,32 @@ export default function PengeluaranPage() {
 
                 {/* Add FT Pelayan */}
                 <div className="border-t pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Tambah PK Pelayan FT:</p>
+                  <p className="text-base font-medium text-gray-700 mb-2">Tambah PK Pelayan FT:</p>
                   <div className="flex gap-2 items-end">
                     <input
                       type="text"
                       value={ftName}
                       onChange={(e) => setFtName(e.target.value)}
                       placeholder="Nama Pendeta"
-                      className="border rounded-md px-3 py-2 text-sm flex-1"
+                      className="border rounded-md px-4 py-2.5 text-base flex-1"
                     />
-                    <input
-                      type="number"
+                    <NumericInput
                       value={ftAmount}
-                      onChange={(e) => setFtAmount(e.target.value)}
+                      onChange={setFtAmount}
                       placeholder="Jumlah"
-                      className="border rounded-md px-3 py-2 text-sm w-32"
+                      className="border rounded-md px-4 py-2.5 text-base w-32"
                     />
-                    <button type="button" onClick={addFtPelayan} className="bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-300">
+                    <button type="button" onClick={addFtPelayan} className="bg-gray-200 text-gray-700 px-4 py-2.5 rounded-md text-base hover:bg-gray-300">
                       Tambah
                     </button>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
-                  <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm">
+                  <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
                     {saving ? "Menyimpan..." : "Simpan Semua"}
                   </button>
-                  <button type="button" onClick={() => setShowWeeklyForm(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 text-sm">
+                  <button type="button" onClick={() => setShowWeeklyForm(false)} className="bg-gray-200 text-gray-700 px-5 py-2.5 rounded-md hover:bg-gray-300 text-base">
                     Batal
                   </button>
                 </div>
@@ -307,27 +317,27 @@ export default function PengeluaranPage() {
             <form onSubmit={handleManualSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
-                  <input type="date" required value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+                  <label className="block text-base font-medium text-gray-700 mb-1">Tanggal</label>
+                  <input type="date" required min={dateMin} max={dateMax} value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
-                  <select required value={manualCategory} onChange={(e) => setManualCategory(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm">
+                  <label className="block text-base font-medium text-gray-700 mb-1">Kategori</label>
+                  <select required value={manualCategory} onChange={(e) => setManualCategory(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base">
                     {Object.entries(EXPENSE_CATEGORIES).map(([key, label]) => (
                       <option key={key} value={key}>{label}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
-                  <input type="text" required value={manualDesc} onChange={(e) => setManualDesc(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="Keterangan" />
+                  <label className="block text-base font-medium text-gray-700 mb-1">Keterangan</label>
+                  <input type="text" required value={manualDesc} onChange={(e) => setManualDesc(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="Keterangan" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
-                  <input type="number" required value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="0" />
+                  <label className="block text-base font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
+                  <NumericInput value={manualAmount} onChange={setManualAmount} required className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
                 </div>
               </div>
-              <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
                 {saving ? "Menyimpan..." : "Simpan Pengeluaran"}
               </button>
             </form>
@@ -341,7 +351,7 @@ export default function PengeluaranPage() {
           <h2 className="font-semibold text-gray-800">
             Data Pengeluaran - {getMonthName(month)} {year}
           </h2>
-          <p className="text-sm font-medium text-red-600">
+          <p className="text-base font-medium text-red-600">
             Total: {formatRupiah(totalExpense)}
           </p>
         </div>
@@ -367,18 +377,18 @@ export default function PengeluaranPage() {
                     {editingId === entry.id ? (
                       <>
                         <td className="px-4 py-2">
-                          <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="border rounded px-2 py-1 text-sm w-full" />
+                          <input type="date" min={dateMin} max={dateMax} value={editDate} onChange={(e) => setEditDate(e.target.value)} className="border rounded px-3 py-1.5 text-base w-full" />
                         </td>
                         <td className="px-4 py-2 text-gray-600">{EXPENSE_CATEGORIES[entry.category] || entry.category}</td>
                         <td className="px-4 py-2">
-                          <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="border rounded px-2 py-1 text-sm w-full" />
+                          <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="border rounded px-3 py-1.5 text-base w-full" />
                         </td>
                         <td className="px-4 py-2">
-                          <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="border rounded px-2 py-1 text-sm w-full text-right" />
+                          <NumericInput value={editAmount} onChange={setEditAmount} className="border rounded px-3 py-1.5 text-base w-full text-right" />
                         </td>
                         <td className="px-4 py-2 text-center space-x-1">
-                          <button onClick={handleEditSave} disabled={saving} className="text-green-600 hover:underline text-xs">Simpan</button>
-                          <button onClick={() => setEditingId(null)} className="text-gray-500 hover:underline text-xs">Batal</button>
+                          <button onClick={handleEditSave} disabled={saving} className="text-green-600 hover:underline text-sm">Simpan</button>
+                          <button onClick={() => setEditingId(null)} className="text-gray-500 hover:underline text-sm">Batal</button>
                         </td>
                       </>
                     ) : (
@@ -391,8 +401,8 @@ export default function PengeluaranPage() {
                         <td className="px-4 py-2 text-right font-medium text-gray-800">{formatRupiah(entry.amount)}</td>
                         {!isLocked && (
                           <td className="px-4 py-2 text-center space-x-2">
-                            <button onClick={() => startEdit(entry)} className="text-blue-600 hover:underline text-xs">Edit</button>
-                            <button onClick={() => handleDelete(entry.id)} className="text-red-600 hover:underline text-xs">Hapus</button>
+                            <button onClick={() => startEdit(entry)} className="text-blue-600 hover:underline text-sm">Edit</button>
+                            <button onClick={() => handleDelete(entry.id)} className="text-red-600 hover:underline text-sm">Hapus</button>
                           </td>
                         )}
                       </>

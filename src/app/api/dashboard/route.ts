@@ -39,26 +39,24 @@ export async function GET() {
     .filter((e) => e.category === "persembahan")
     .reduce((s, e) => s + e.amount, 0);
 
-  // Get last 6 months trend
-  const trend = [];
-  for (let i = 5; i >= 0; i--) {
-    let m = currentMonth - i;
-    let y = currentYear;
-    if (m <= 0) {
-      m += 12;
-      y--;
-    }
-    const period = await prisma.period.findUnique({
-      where: { month_year: { month: m, year: y } },
-      include: { incomeEntries: true, expenseEntries: true },
-    });
-    trend.push({
-      month: m,
-      year: y,
-      income: period?.incomeEntries.reduce((s, e) => s + e.amount, 0) || 0,
-      expense: period?.expenseEntries.reduce((s, e) => s + e.amount, 0) || 0,
-    });
-  }
+  // Get periods that have data, ordered by date, max 6
+  const periodsWithData = await prisma.period.findMany({
+    where: {
+      OR: [
+        { incomeEntries: { some: {} } },
+        { expenseEntries: { some: {} } },
+      ],
+    },
+    include: { incomeEntries: true, expenseEntries: true },
+    orderBy: [{ year: "asc" }, { month: "asc" }],
+  });
+
+  const trend = periodsWithData.slice(-6).map((p) => ({
+    month: p.month,
+    year: p.year,
+    income: p.incomeEntries.reduce((s, e) => s + e.amount, 0),
+    expense: p.expenseEntries.reduce((s, e) => s + e.amount, 0),
+  }));
 
   return NextResponse.json({
     currentMonth,
