@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+.claude
+prisma/dev.db
+dev.db
+*.md

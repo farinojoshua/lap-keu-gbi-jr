@@ -12,10 +12,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma Client
 RUN npx prisma generate
-
-# Build Next.js
 RUN npm run build
 
 # Production image
@@ -33,9 +30,13 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=builder /app/docker-start.sh ./docker-start.sh
 
 # Create directory for SQLite database
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+RUN chmod +x /app/docker-start.sh
 
 USER nextjs
 
@@ -43,6 +44,5 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-ENV DATABASE_URL="file:/app/data/prod.db"
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+CMD ["sh", "/app/docker-start.sh"]
