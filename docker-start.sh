@@ -1,25 +1,11 @@
 #!/bin/sh
+set -e
 
-# Run database migrations
-npx prisma migrate deploy
+echo "=== Running database migrations ==="
+node ./node_modules/prisma/build/index.js migrate deploy
 
-# Seed default admin if database is fresh (no users yet)
-node -e "
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-(async () => {
-  const count = await prisma.user.count();
-  if (count === 0) {
-    const bcrypt = require('bcryptjs');
-    const hash = await bcrypt.hash('admin123', 10);
-    await prisma.user.create({
-      data: { username: 'admin', password: hash, name: 'Administrator', role: 'admin' }
-    });
-    console.log('Default admin user created');
-  }
-  await prisma.\$disconnect();
-})();
-"
+echo "=== Running seed script ==="
+node ./docker-seed.js
 
-# Start the app
+echo "=== Starting application ==="
 node server.js
