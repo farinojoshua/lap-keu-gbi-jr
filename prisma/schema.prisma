@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String
+  role      String   @default("bendahara")
+  createdAt DateTime @default(now())
+}
+
+model Period {
+  id            String   @id @default(cuid())
+  month         Int
+  year          Int
+  saldoPindahan Float    @default(0)
+  saldoRekening Float    @default(0)
+  saldoCash     Float    @default(0)
+  isLocked      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  incomeEntries  IncomeEntry[]
+  expenseEntries ExpenseEntry[]
+  fundBalances   FundBalance[]
+
+  @@unique([month, year])
+}
+
+model IncomeEntry {
+  id          String   @id @default(cuid())
+  periodId    String
+  date        String
+  category    String
+  subcategory String   @default("")
+  description String   @default("")
+  amount      Float
+  attendance  Int?
+  createdAt   DateTime @default(now())
+
+  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+}
+
+model ExpenseEntry {
+  id          String   @id @default(cuid())
+  periodId    String
+  date        String
+  category    String
+  description String   @default("")
+  amount      Float
+  isFixed     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+}
+
+model FixedExpenseTemplate {
+  id            String  @id @default(cuid())
+  category      String
+  description   String
+  defaultAmount Float
+  isActive      Boolean @default(true)
+}
+
+model FundBalance {
+  id       String @id @default(cuid())
+  periodId String
+  fundType String
+  balance  Float  @default(0)
+  note     String @default("")
+
+  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([periodId, fundType])
+}
+
+model KomselGroup {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  isActive Boolean @default(true)
+}
+
+model ChurchInfo {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
