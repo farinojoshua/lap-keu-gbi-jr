@@ -6,7 +6,7 @@ import { formatRupiah, generateYears } from "@/lib/utils";
 import { showSuccess, showError, showConfirmDelete, showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Download, Upload, Database } from "lucide-react";
+import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Download, Upload, Database, RotateCcw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Template {
@@ -630,6 +630,48 @@ export default function PengaturanPage() {
                     Pilih File Backup (.db)
                   </button>
                 </div>
+              </div>
+
+              <hr />
+
+              {/* Reset Database */}
+              <div className="max-w-lg space-y-3">
+                <h3 className="text-lg font-semibold text-red-700">Reset Database</h3>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  <strong>Peringatan:</strong> Reset akan <em>menghapus semua data</em> (pemasukan, pengeluaran, periode, pengguna) dan mengembalikan ke data awal. Login kembali dengan <strong>admin / admin123</strong>.
+                </div>
+                <button
+                  onClick={async () => {
+                    const confirm = await showConfirmAction(
+                      "Reset Database?",
+                      "SEMUA data akan dihapus dan dikembalikan ke data awal. Aksi ini tidak bisa dibatalkan!"
+                    );
+                    if (!confirm.isConfirmed) return;
+
+                    const confirm2 = await showConfirmAction(
+                      "Yakin 100%?",
+                      "Ketik ulang: semua data akan hilang. Lanjutkan reset?"
+                    );
+                    if (!confirm2.isConfirmed) return;
+
+                    try {
+                      const res = await fetch("/api/reset", { method: "POST" });
+                      const result = await res.json();
+                      if (result.error) {
+                        showError(result.error);
+                      } else {
+                        showSuccess("Database berhasil di-reset! Halaman akan dimuat ulang.");
+                        setTimeout(() => window.location.href = "/login", 1500);
+                      }
+                    } catch {
+                      showError("Gagal mereset database.");
+                    }
+                  }}
+                  className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 text-base shadow-sm flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset ke Data Awal
+                </button>
               </div>
             </div>
           )}
