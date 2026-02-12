@@ -1,4 +1,5 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, getServerSession } from "next-auth";
+import { NextResponse } from "next/server";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
@@ -57,3 +58,32 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
+
+// ---------- Auth helpers for API routes ----------
+
+interface AuthSession {
+  user: { id: string; name: string; role: string; username: string };
+}
+
+/**
+ * Require any authenticated user. Returns session or 401 response.
+ */
+export async function requireAuth(): Promise<AuthSession | NextResponse> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return session as unknown as AuthSession;
+}
+
+/**
+ * Require admin role. Returns session or 401/403 response.
+ */
+export async function requireAdmin(): Promise<AuthSession | NextResponse> {
+  const result = await requireAuth();
+  if (result instanceof NextResponse) return result;
+  if (result.user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return result;
+}

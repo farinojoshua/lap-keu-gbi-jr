@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
+import {
+  LayoutDashboard,
+  TrendingUp,
+  TrendingDown,
+  FileText,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 
-const navItems = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/pemasukan", label: "Pemasukan", icon: "💰" },
-  { href: "/pengeluaran", label: "Pengeluaran", icon: "💸" },
-  { href: "/laporan", label: "Laporan", icon: "📄" },
-  { href: "/pengaturan", label: "Pengaturan", icon: "⚙️" },
+const navItems: { href: string; label: string; icon: LucideIcon; adminOnly?: boolean }[] = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/pemasukan", label: "Pemasukan", icon: TrendingUp },
+  { href: "/pengeluaran", label: "Pengeluaran", icon: TrendingDown },
+  { href: "/laporan", label: "Laporan", icon: FileText },
+  { href: "/pengaturan", label: "Pengaturan", icon: Settings },
 ];
 
 export default function Sidebar({
@@ -19,6 +28,12 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+
+  const visibleItems = navItems.filter(
+    (item) => !item.adminOnly || role === "admin"
+  );
 
   return (
     <>
@@ -31,21 +46,30 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${
+        className={`fixed top-0 left-0 z-50 h-screen w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:sticky lg:z-auto lg:shrink-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex flex-col items-center text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo_gbi.png"
+            alt="Logo GBI"
+            width={64}
+            height={64}
+            className="rounded-full mb-3"
+          />
           <h1 className="text-xl font-bold text-gray-800">GBI Jonggol Raya</h1>
           <p className="text-sm text-gray-500">Laporan Keuangan</p>
         </div>
 
-        <nav className="p-4 space-y-2">
-          {navItems.map((item) => {
+        <nav className="p-4 space-y-1 sidebar-scroll overflow-y-auto" style={{ maxHeight: "calc(100vh - 88px)" }}>
+          {visibleItems.map((item) => {
             const isActive =
               item.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
@@ -57,7 +81,7 @@ export default function Sidebar({
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                <span className="text-xl">{item.icon}</span>
+                <Icon className="w-5 h-5 shrink-0" />
                 {item.label}
               </Link>
             );

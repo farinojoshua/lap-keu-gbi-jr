@@ -13,7 +13,7 @@ interface Props {
 export default function PDFExportButton({ data, month, year }: Props) {
   return (
     <PDFDownloadLink
-      document={<ReportPDF data={data} />}
+      document={<ReportPDF data={data} logoUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/logo_gbi.png`} />}
       fileName={`Laporan-Keuangan-${getMonthName(month)}-${year}.pdf`}
     >
       {({ loading }) => (

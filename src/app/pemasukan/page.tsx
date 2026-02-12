@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { formatRupiah, getMonthName, INCOME_CATEGORIES } from "@/lib/utils";
-import { showSuccess, showConfirmDelete } from "@/lib/swal";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { formatRupiah, getMonthName, INCOME_CATEGORIES, formatDateID, generateYears } from "@/lib/utils";
+import { showSuccess, showConfirmDelete, showError } from "@/lib/swal";
+import { showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
+import { SkeletonTable } from "@/components/ui/Skeleton";
+import { Save, Pencil, Trash2, Lock, Check, X, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+
+type SortKey = "date" | "amount";
+type SortDir = "asc" | "desc";
 
 interface IncomeEntry {
   id: string;
@@ -34,6 +40,9 @@ export default function PemasukanPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   // Form states
   const [ibadahDate, setIbadahDate] = useState("");
@@ -69,15 +78,20 @@ export default function PemasukanPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const periodRes = await fetch(`/api/periods?month=${month}&year=${year}`);
-    const period = await periodRes.json();
-    setPeriodId(period.id);
-    setIsLocked(period.isLocked);
+    try {
+      const periodRes = await fetch(`/api/periods?month=${month}&year=${year}`);
+      const period = await periodRes.json();
+      setPeriodId(period.id);
+      setIsLocked(period.isLocked);
 
-    const entriesRes = await fetch(`/api/income?periodId=${period.id}`);
-    const entriesData = await entriesRes.json();
-    setEntries(entriesData);
-    setLoading(false);
+      const entriesRes = await fetch(`/api/income?periodId=${period.id}`);
+      const entriesData = await entriesRes.json();
+      setEntries(entriesData);
+    } catch {
+      showError("Gagal memuat data. Periksa koneksi Anda.");
+    } finally {
+      setLoading(false);
+    }
   }, [month, year]);
 
   useEffect(() => {
@@ -92,57 +106,62 @@ export default function PemasukanPage() {
     if (!periodId || isLocked) return;
     setSaving(true);
 
-    const batch = [];
-    if (Number(kantongUngu) > 0) {
-      batch.push({
-        periodId,
-        date: ibadahDate,
-        category: "persembahan",
-        subcategory: "kantong_ungu",
-        description: "Persembahan Kantong Ungu",
-        amount: Number(kantongUngu),
-        attendance: Number(ibadahHadir) || null,
-      });
-    }
-    if (Number(kantongHitam) > 0) {
-      batch.push({
-        periodId,
-        date: ibadahDate,
-        category: "persembahan",
-        subcategory: "kantong_hitam",
-        description: "Persembahan Kantong Hitam",
-        amount: Number(kantongHitam),
-      });
-    }
-    if (Number(smAmount) > 0) {
-      batch.push({
-        periodId,
-        date: ibadahDate,
-        category: "persembahan",
-        subcategory: "sekolah_minggu",
-        description: "Persembahan Sekolah Minggu",
-        amount: Number(smAmount),
-        attendance: Number(smHadir) || null,
-      });
-    }
+    try {
+      const batch = [];
+      if (Number(kantongUngu) > 0) {
+        batch.push({
+          periodId,
+          date: ibadahDate,
+          category: "persembahan",
+          subcategory: "kantong_ungu",
+          description: "Persembahan Kantong Ungu",
+          amount: Number(kantongUngu),
+          attendance: Number(ibadahHadir) || null,
+        });
+      }
+      if (Number(kantongHitam) > 0) {
+        batch.push({
+          periodId,
+          date: ibadahDate,
+          category: "persembahan",
+          subcategory: "kantong_hitam",
+          description: "Persembahan Kantong Hitam",
+          amount: Number(kantongHitam),
+        });
+      }
+      if (Number(smAmount) > 0) {
+        batch.push({
+          periodId,
+          date: ibadahDate,
+          category: "persembahan",
+          subcategory: "sekolah_minggu",
+          description: "Persembahan Sekolah Minggu",
+          amount: Number(smAmount),
+          attendance: Number(smHadir) || null,
+        });
+      }
 
-    if (batch.length > 0) {
-      await fetch("/api/income", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(batch),
-      });
-    }
+      if (batch.length > 0) {
+        await fetch("/api/income", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(batch),
+        });
+      }
 
-    setIbadahDate("");
-    setIbadahHadir("");
-    setKantongUngu("");
-    setKantongHitam("");
-    setSmHadir("");
-    setSmAmount("");
-    setSaving(false);
-    loadData();
-    showSuccess("Data ibadah berhasil disimpan");
+      setIbadahDate("");
+      setIbadahHadir("");
+      setKantongUngu("");
+      setKantongHitam("");
+      setSmHadir("");
+      setSmAmount("");
+      loadData();
+      showSuccess("Data ibadah berhasil disimpan");
+    } catch {
+      showError("Gagal menyimpan data ibadah.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSingleSubmit(
@@ -154,45 +173,59 @@ export default function PemasukanPage() {
     if (!periodId || isLocked) return;
     setSaving(true);
 
-    await fetch("/api/income", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ periodId, ...data }),
-    });
+    try {
+      await fetch("/api/income", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periodId, ...data }),
+      });
 
-    resetFn();
-    setSaving(false);
-    loadData();
-    showSuccess("Data berhasil disimpan");
+      resetFn();
+      loadData();
+      showSuccess("Data berhasil disimpan");
+    } catch {
+      showError("Gagal menyimpan data.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(id: string) {
     if (isLocked) return;
     const result = await showConfirmDelete();
     if (!result.isConfirmed) return;
-    await fetch(`/api/income?id=${id}`, { method: "DELETE" });
-    loadData();
-    showSuccess("Data berhasil dihapus");
+    try {
+      await fetch(`/api/income?id=${id}`, { method: "DELETE" });
+      loadData();
+      showSuccess("Data berhasil dihapus");
+    } catch {
+      showError("Gagal menghapus data.");
+    }
   }
 
   async function handleEditSave() {
     if (!editingId || isLocked) return;
     setSaving(true);
-    await fetch("/api/income", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: editingId,
-        date: editDate,
-        description: editDesc,
-        amount: Number(editAmount),
-        attendance: editAttendance ? Number(editAttendance) : null,
-      }),
-    });
-    setEditingId(null);
-    setSaving(false);
-    loadData();
-    showSuccess("Data berhasil diperbarui");
+    try {
+      await fetch("/api/income", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingId,
+          date: editDate,
+          description: editDesc,
+          amount: Number(editAmount),
+          attendance: editAttendance ? Number(editAttendance) : null,
+        }),
+      });
+      setEditingId(null);
+      loadData();
+      showSuccess("Data berhasil diperbarui");
+    } catch {
+      showError("Gagal memperbarui data.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function startEdit(entry: IncomeEntry) {
@@ -205,6 +238,95 @@ export default function PemasukanPage() {
 
   const totalIncome = entries.reduce((s, e) => s + e.amount, 0);
 
+  // Search & Sort
+  const filteredEntries = useMemo(() => {
+    let result = entries;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (e) =>
+          e.description.toLowerCase().includes(q) ||
+          e.category.toLowerCase().includes(q) ||
+          (INCOME_CATEGORIES[e.category] || "").toLowerCase().includes(q) ||
+          e.date.includes(q) ||
+          formatDateID(e.date).toLowerCase().includes(q)
+      );
+    }
+    return [...result].sort((a, b) => {
+      const mul = sortDir === "asc" ? 1 : -1;
+      if (sortKey === "date") return a.date.localeCompare(b.date) * mul;
+      return (a.amount - b.amount) * mul;
+    });
+  }, [entries, searchQuery, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function getSortIcon(key: SortKey) {
+    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  }
+
+  // Warn on browser close/refresh if unsaved data
+  const hasUnsavedData =
+    ibadahDate !== "" ||
+    ibadahHadir !== "" ||
+    kantongUngu !== "" ||
+    kantongHitam !== "" ||
+    smHadir !== "" ||
+    smAmount !== "" ||
+    perpuluhanDate !== "" ||
+    perpuluhanNama !== "" ||
+    perpuluhanAmount !== "" ||
+    komselDate !== "" ||
+    komselNama !== "" ||
+    komselHadir !== "" ||
+    komselAmount !== "" ||
+    syukurDate !== "" ||
+    syukurNama !== "" ||
+    syukurAmount !== "" ||
+    lainDate !== "" ||
+    lainDesc !== "" ||
+    lainAmount !== "";
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedData) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedData]);
+
+  async function handleMonthChange(newMonth: number) {
+    if (hasUnsavedData) {
+      const result = await showConfirmAction(
+        "Data belum disimpan",
+        "Ada form yang belum disimpan. Yakin ingin pindah periode?"
+      );
+      if (!result.isConfirmed) return;
+    }
+    setMonth(newMonth);
+  }
+
+  async function handleYearChange(newYear: number) {
+    if (hasUnsavedData) {
+      const result = await showConfirmAction(
+        "Data belum disimpan",
+        "Ada form yang belum disimpan. Yakin ingin pindah periode?"
+      );
+      if (!result.isConfirmed) return;
+    }
+    setYear(newYear);
+  }
+
   const daysInMonth = new Date(year, month, 0).getDate();
   const dateMin = `${year}-${String(month).padStart(2, "0")}-01`;
   const dateMax = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
@@ -216,8 +338,8 @@ export default function PemasukanPage() {
         <div className="flex gap-2 items-center">
           <select
             value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="border rounded-md px-4 py-2.5 text-base"
+            onChange={(e) => handleMonthChange(Number(e.target.value))}
+            className="border border-gray-300 rounded-lg px-4 py-2.5 text-base"
           >
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
@@ -225,10 +347,10 @@ export default function PemasukanPage() {
           </select>
           <select
             value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="border rounded-md px-4 py-2.5 text-base"
+            onChange={(e) => handleYearChange(Number(e.target.value))}
+            className="border border-gray-300 rounded-lg px-4 py-2.5 text-base"
           >
-            {[2024, 2025, 2026, 2027].map((y) => (
+            {generateYears().map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
@@ -236,7 +358,8 @@ export default function PemasukanPage() {
       </div>
 
       {isLocked && (
-        <div className="bg-yellow-50 text-yellow-700 p-3 rounded-md text-base">
+        <div className="bg-yellow-50 text-yellow-700 p-3 rounded-lg border border-yellow-200 text-base flex items-center gap-2">
+          <Lock className="w-4 h-4 shrink-0" />
           Periode ini sudah ditutup. Data tidak bisa diubah.
         </div>
       )}
@@ -244,7 +367,7 @@ export default function PemasukanPage() {
       {/* Form Tabs */}
       {!isLocked && (
         <div className="bg-white rounded-lg shadow-sm border">
-          <div className="border-b overflow-x-auto">
+          <div className="border-b bg-gray-50/50 overflow-x-auto">
             <div className="flex min-w-max">
               {([
                 ["ibadah", "Ibadah Minggu"],
@@ -258,7 +381,7 @@ export default function PemasukanPage() {
                   onClick={() => setActiveForm(key)}
                   className={`px-5 py-3.5 text-base font-medium whitespace-nowrap border-b-2 transition-colors ${
                     activeForm === key
-                      ? "border-blue-500 text-blue-600"
+                      ? "border-blue-500 text-blue-600 bg-white"
                       : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
                 >
@@ -274,35 +397,36 @@ export default function PemasukanPage() {
               <form onSubmit={handleIbadahSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" required min={dateMin} max={dateMax} value={ibadahDate} onChange={(e) => setIbadahDate(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Tanggal</label>
+                    <input type="date" required min={dateMin} max={dateMax} value={ibadahDate} onChange={(e) => setIbadahDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah Hadir Ibadah</label>
-                    <NumericInput value={ibadahHadir} onChange={setIbadahHadir} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah Hadir Ibadah</label>
+                    <NumericInput value={ibadahHadir} onChange={setIbadahHadir} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Kantong Ungu (Rp)</label>
-                    <NumericInput value={kantongUngu} onChange={setKantongUngu} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Kantong Ungu (Rp)</label>
+                    <NumericInput value={kantongUngu} onChange={setKantongUngu} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Kantong Hitam (Rp)</label>
-                    <NumericInput value={kantongHitam} onChange={setKantongHitam} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Kantong Hitam (Rp)</label>
+                    <NumericInput value={kantongHitam} onChange={setKantongHitam} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Persembahan SM (Rp)</label>
-                    <NumericInput value={smAmount} onChange={setSmAmount} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Persembahan SM (Rp)</label>
+                    <NumericInput value={smAmount} onChange={setSmAmount} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah Hadir SM</label>
-                    <NumericInput value={smHadir} onChange={setSmHadir} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah Hadir SM</label>
+                    <NumericInput value={smHadir} onChange={setSmHadir} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
+                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4" />
                   {saving ? "Menyimpan..." : "Simpan Data Ibadah"}
                 </button>
               </form>
@@ -328,19 +452,20 @@ export default function PemasukanPage() {
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" required min={dateMin} max={dateMax} value={perpuluhanDate} onChange={(e) => setPerpuluhanDate(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Tanggal</label>
+                    <input type="date" required min={dateMin} max={dateMax} value={perpuluhanDate} onChange={(e) => setPerpuluhanDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Nama</label>
-                    <input type="text" required value={perpuluhanNama} onChange={(e) => setPerpuluhanNama(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="Nama pemberi" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Nama</label>
+                    <input type="text" required value={perpuluhanNama} onChange={(e) => setPerpuluhanNama(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="Nama pemberi" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
-                    <NumericInput value={perpuluhanAmount} onChange={setPerpuluhanAmount} required className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah (Rp)</label>
+                    <NumericInput value={perpuluhanAmount} onChange={setPerpuluhanAmount} required className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
+                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4" />
                   {saving ? "Menyimpan..." : "Simpan Perpuluhan"}
                 </button>
               </form>
@@ -366,14 +491,14 @@ export default function PemasukanPage() {
                 }
                 className="space-y-4"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" required min={dateMin} max={dateMax} value={komselDate} onChange={(e) => setKomselDate(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Tanggal</label>
+                    <input type="date" required min={dateMin} max={dateMax} value={komselDate} onChange={(e) => setKomselDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Nama Komsel</label>
-                    <select required value={komselNama} onChange={(e) => setKomselNama(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base">
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Nama Komsel</label>
+                    <select required value={komselNama} onChange={(e) => setKomselNama(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base">
                       <option value="">Pilih Komsel</option>
                       {komselGroups.map((g) => (
                         <option key={g.id} value={g.name}>{g.name}</option>
@@ -381,15 +506,16 @@ export default function PemasukanPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah Hadir</label>
-                    <NumericInput value={komselHadir} onChange={setKomselHadir} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah Hadir</label>
+                    <NumericInput value={komselHadir} onChange={setKomselHadir} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
-                    <NumericInput value={komselAmount} onChange={setKomselAmount} required className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah (Rp)</label>
+                    <NumericInput value={komselAmount} onChange={setKomselAmount} required className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
+                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4" />
                   {saving ? "Menyimpan..." : "Simpan Komsel"}
                 </button>
               </form>
@@ -415,19 +541,20 @@ export default function PemasukanPage() {
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" required min={dateMin} max={dateMax} value={syukurDate} onChange={(e) => setSyukurDate(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Tanggal</label>
+                    <input type="date" required min={dateMin} max={dateMax} value={syukurDate} onChange={(e) => setSyukurDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Nama</label>
-                    <input type="text" required value={syukurNama} onChange={(e) => setSyukurNama(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="Nama pemberi" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Nama</label>
+                    <input type="text" required value={syukurNama} onChange={(e) => setSyukurNama(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="Nama pemberi" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
-                    <NumericInput value={syukurAmount} onChange={setSyukurAmount} required className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah (Rp)</label>
+                    <NumericInput value={syukurAmount} onChange={setSyukurAmount} required className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
+                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4" />
                   {saving ? "Menyimpan..." : "Simpan Ucapan Syukur"}
                 </button>
               </form>
@@ -451,29 +578,30 @@ export default function PemasukanPage() {
                 }
                 className="space-y-4"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" required min={dateMin} max={dateMax} value={lainDate} onChange={(e) => setLainDate(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Tanggal</label>
+                    <input type="date" required min={dateMin} max={dateMax} value={lainDate} onChange={(e) => setLainDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Kategori</label>
-                    <select required value={lainCategory} onChange={(e) => setLainCategory(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base">
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Kategori</label>
+                    <select required value={lainCategory} onChange={(e) => setLainCategory(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base">
                       {["pembangunan", "diakonia", "donasi", "dll"].map((c) => (
                         <option key={c} value={c}>{INCOME_CATEGORIES[c]}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Keterangan</label>
-                    <input type="text" required value={lainDesc} onChange={(e) => setLainDesc(e.target.value)} className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="Keterangan" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Keterangan</label>
+                    <input type="text" required value={lainDesc} onChange={(e) => setLainDesc(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="Keterangan" />
                   </div>
                   <div>
-                    <label className="block text-base font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
-                    <NumericInput value={lainAmount} onChange={setLainAmount} required className="w-full border rounded-md px-4 py-2.5 text-base" placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Jumlah (Rp)</label>
+                    <NumericInput value={lainAmount} onChange={setLainAmount} required className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 text-base">
+                <button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4" />
                   {saving ? "Menyimpan..." : "Simpan"}
                 </button>
               </form>
@@ -484,65 +612,95 @@ export default function PemasukanPage() {
 
       {/* Data Table */}
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="font-semibold text-gray-800">
-            Data Pemasukan - {getMonthName(month)} {year}
-          </h2>
-          <p className="text-base font-medium text-green-600">
-            Total: {formatRupiah(totalIncome)}
-          </p>
+        <div className="p-4 border-b space-y-3">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <h2 className="font-semibold text-gray-800">
+              Data Pemasukan - {getMonthName(month)} {year}
+            </h2>
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-50 text-green-700 text-base font-medium">
+              Total: {formatRupiah(totalIncome)}
+            </span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari keterangan, kategori, tanggal..."
+              className="w-full border border-gray-300 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
         <div className="overflow-x-auto">
           {loading ? (
-            <div className="p-8 text-center text-gray-500">Memuat data...</div>
-          ) : entries.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">Belum ada data pemasukan</div>
+            <SkeletonTable cols={6} rows={5} />
+          ) : filteredEntries.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              {entries.length === 0 ? "Belum ada data pemasukan" : "Tidak ada data yang cocok dengan pencarian"}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Tanggal</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Kategori</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Keterangan</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Hadir</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Jumlah</th>
-                  {!isLocked && <th className="text-center px-4 py-3 font-medium text-gray-600">Aksi</th>}
+                  <th onClick={() => toggleSort("date")} className="text-left px-4 py-3 text-xs uppercase tracking-wider font-semibold text-gray-500 cursor-pointer hover:text-gray-700 select-none">
+                    <span className="inline-flex items-center">Tanggal{getSortIcon("date")}</span>
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider font-semibold text-gray-500">Kategori</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider font-semibold text-gray-500">Keterangan</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider font-semibold text-gray-500">Hadir</th>
+                  <th onClick={() => toggleSort("amount")} className="text-right px-4 py-3 text-xs uppercase tracking-wider font-semibold text-gray-500 cursor-pointer hover:text-gray-700 select-none">
+                    <span className="inline-flex items-center justify-end">Jumlah{getSortIcon("amount")}</span>
+                  </th>
+                  {!isLocked && <th className="text-center px-4 py-3 text-xs uppercase tracking-wider font-semibold text-gray-500">Aksi</th>}
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => (
+                {filteredEntries.map((entry) => (
                   <tr key={entry.id} className="border-t hover:bg-gray-50">
                     {editingId === entry.id ? (
                       <>
                         <td className="px-4 py-2">
-                          <input type="date" min={dateMin} max={dateMax} value={editDate} onChange={(e) => setEditDate(e.target.value)} className="border rounded px-3 py-1.5 text-base w-full" />
+                          <input type="date" min={dateMin} max={dateMax} value={editDate} onChange={(e) => setEditDate(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full" />
                         </td>
                         <td className="px-4 py-2 text-gray-600">{INCOME_CATEGORIES[entry.category] || entry.category}</td>
                         <td className="px-4 py-2">
-                          <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="border rounded px-3 py-1.5 text-base w-full" />
+                          <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full" />
                         </td>
                         <td className="px-4 py-2">
-                          <NumericInput value={editAttendance} onChange={setEditAttendance} className="border rounded px-3 py-1.5 text-base w-24" />
+                          <NumericInput value={editAttendance} onChange={setEditAttendance} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-24" />
                         </td>
                         <td className="px-4 py-2">
-                          <NumericInput value={editAmount} onChange={setEditAmount} className="border rounded px-3 py-1.5 text-base w-full text-right" />
+                          <NumericInput value={editAmount} onChange={setEditAmount} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full text-right" />
                         </td>
-                        <td className="px-4 py-2 text-center space-x-1">
-                          <button onClick={handleEditSave} disabled={saving} className="text-green-600 hover:underline text-sm">Simpan</button>
-                          <button onClick={() => setEditingId(null)} className="text-gray-500 hover:underline text-sm">Batal</button>
+                        <td className="px-4 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={handleEditSave} disabled={saving} className="p-1.5 rounded-lg text-green-600 hover:bg-green-50" title="Simpan">
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100" title="Batal">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="px-4 py-2 text-gray-800">{entry.date}</td>
+                        <td className="px-4 py-2 text-gray-800">{formatDateID(entry.date)}</td>
                         <td className="px-4 py-2 text-gray-600">{INCOME_CATEGORIES[entry.category] || entry.category}</td>
                         <td className="px-4 py-2 text-gray-600">{entry.description}</td>
                         <td className="px-4 py-2 text-gray-600">{entry.attendance || "-"}</td>
                         <td className="px-4 py-2 text-right font-medium text-gray-800">{formatRupiah(entry.amount)}</td>
                         {!isLocked && (
-                          <td className="px-4 py-2 text-center space-x-2">
-                            <button onClick={() => startEdit(entry)} className="text-blue-600 hover:underline text-sm">Edit</button>
-                            <button onClick={() => handleDelete(entry.id)} className="text-red-600 hover:underline text-sm">Hapus</button>
+                          <td className="px-4 py-2 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => startEdit(entry)} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50" title="Edit">
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleDelete(entry.id)} className="p-1.5 rounded-lg text-red-600 hover:bg-red-50" title="Hapus">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         )}
                       </>

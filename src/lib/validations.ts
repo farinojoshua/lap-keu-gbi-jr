@@ -1,0 +1,112 @@
+import { z } from "zod";
+import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "./utils";
+
+// ---------- Income ----------
+
+const incomeCategories = Object.keys(INCOME_CATEGORIES);
+
+export const incomeEntrySchema = z.object({
+  periodId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+  category: z.string().refine((v) => incomeCategories.includes(v), "Kategori tidak valid"),
+  subcategory: z.string().default(""),
+  description: z.string().default(""),
+  amount: z.number().int().min(0, "Jumlah tidak boleh negatif"),
+  attendance: z.number().int().min(0).nullable().optional(),
+});
+
+export const incomeUpdateSchema = z.object({
+  id: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  category: z.string().refine((v) => incomeCategories.includes(v)).optional(),
+  subcategory: z.string().optional(),
+  description: z.string().optional(),
+  amount: z.number().int().min(0).optional(),
+  attendance: z.number().int().min(0).nullable().optional(),
+});
+
+// ---------- Expense ----------
+
+const expenseCategories = Object.keys(EXPENSE_CATEGORIES);
+
+export const expenseEntrySchema = z.object({
+  periodId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+  category: z.string().refine((v) => expenseCategories.includes(v), "Kategori tidak valid"),
+  description: z.string().default(""),
+  amount: z.number().int().min(0, "Jumlah tidak boleh negatif"),
+  isFixed: z.boolean().default(false),
+});
+
+export const expenseUpdateSchema = z.object({
+  id: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  category: z.string().refine((v) => expenseCategories.includes(v)).optional(),
+  description: z.string().optional(),
+  amount: z.number().int().min(0).optional(),
+  isFixed: z.boolean().optional(),
+});
+
+// ---------- Period ----------
+
+export const periodUpdateSchema = z.object({
+  id: z.string().min(1),
+  saldoRekening: z.number().int().optional(),
+  saldoCash: z.number().int().optional(),
+  saldoPindahan: z.number().int().optional(),
+});
+
+// ---------- Expense Template ----------
+
+export const expenseTemplateCreateSchema = z.object({
+  category: z.string().refine((v) => expenseCategories.includes(v), "Kategori tidak valid"),
+  description: z.string().min(1, "Keterangan wajib diisi"),
+  defaultAmount: z.number().int().min(0, "Jumlah tidak boleh negatif"),
+  isActive: z.boolean().default(true),
+});
+
+export const expenseTemplateUpdateSchema = z.object({
+  id: z.string().min(1),
+  category: z.string().refine((v) => expenseCategories.includes(v)).optional(),
+  description: z.string().min(1).optional(),
+  defaultAmount: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// ---------- Fund Balance ----------
+
+export const fundBalanceSchema = z.object({
+  periodId: z.string().min(1),
+  fundType: z.string().min(1, "Jenis dana wajib diisi"),
+  balance: z.number().int(),
+  note: z.string().default(""),
+});
+
+// ---------- Komsel ----------
+
+export const komselCreateSchema = z.object({
+  name: z.string().min(1, "Nama komsel wajib diisi").max(100).transform((v) => v.trim()),
+});
+
+export const komselUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100).transform((v) => v.trim()).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// ---------- User ----------
+
+export const userCreateSchema = z.object({
+  username: z.string().min(3, "Username minimal 3 karakter").max(50),
+  password: z.string().min(6, "Password minimal 6 karakter"),
+  name: z.string().min(1, "Nama wajib diisi"),
+  role: z.enum(["admin", "bendahara"]).default("bendahara"),
+});
+
+export const userUpdateSchema = z.object({
+  id: z.string().min(1),
+  username: z.string().min(3).max(50).optional(),
+  password: z.string().min(6).optional(),
+  name: z.string().min(1).optional(),
+  role: z.enum(["admin", "bendahara"]).optional(),
+});

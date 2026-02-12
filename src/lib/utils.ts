@@ -61,3 +61,25 @@ export const FUND_TYPES: Record<string, string> = {
   komsel: "Kas Komsel",
   diakonia: "Kas Diakonia",
 };
+
+export function formatDateID(dateStr: string): string {
+  if (!dateStr) return "-";
+  const MONTH_SHORT = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+  ];
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const day = parseInt(parts[2], 10);
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  return `${day} ${MONTH_SHORT[monthIdx]} ${parts[0]}`;
+}
+
+export function generateYears(): number[] {
+  const currentYear = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = currentYear - 2; y <= currentYear + 2; y++) {
+    years.push(y);
+  }
+  return years;
+}

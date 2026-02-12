@@ -1,7 +1,17 @@
 "use client";
 
-import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Font, Image } from "@react-pdf/renderer";
 import { formatNumber, getMonthName, INCOME_CATEGORIES, EXPENSE_CATEGORIES, FUND_TYPES } from "@/lib/utils";
+
+/** Convert yyyy-mm-dd → "8 Feb 2026" */
+function formatDateID(dateStr: string) {
+  const MONTH_SHORT = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+  ];
+  const [y, m, d] = dateStr.split("-");
+  return `${parseInt(d, 10)} ${MONTH_SHORT[parseInt(m, 10) - 1]} ${y}`;
+}
 
 Font.register({
   family: "Roboto",
@@ -31,12 +41,13 @@ const colors = {
 
 const styles = StyleSheet.create({
   page: { padding: 30, fontSize: 9, fontFamily: "Roboto", color: colors.gray800 },
-  header: { textAlign: "center", marginBottom: 15 },
+  header: { textAlign: "center", marginBottom: 15, alignItems: "center" },
+  logo: { width: 40, height: 40, marginBottom: 6, borderRadius: 20 },
   title: { fontSize: 12, fontWeight: 700, marginBottom: 2 },
   subtitle: { fontSize: 10, marginBottom: 4, color: colors.gray600 },
   churchName: { fontSize: 10, fontWeight: 700, marginBottom: 8 },
 
-  // Saldo Pindahan
+  // Saldo Bulan Lalu
   saldoPindahan: { flexDirection: "row", justifyContent: "space-between", backgroundColor: colors.blue50, padding: 8, borderRadius: 3, marginBottom: 10 },
 
   // Section titles
@@ -75,9 +86,8 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: { marginTop: 30, flexDirection: "row", justifyContent: "space-between" },
-  signatureBlock: { width: "40%", textAlign: "center" },
+  signatureBlock: { width: "30%", textAlign: "center" },
   signatureName: { marginTop: 50, fontWeight: 700, borderTopWidth: 1, borderTopColor: "#9ca3af", paddingTop: 3 },
-  signatureTitle: { fontSize: 8, color: colors.gray600 },
 
   bold: { fontWeight: 700 },
 });
@@ -93,7 +103,7 @@ interface ReportData {
   fundBalances: Record<string, number>;
 }
 
-export default function ReportPDF({ data }: { data: ReportData }) {
+export default function ReportPDF({ data, logoUrl }: { data: ReportData; logoUrl?: string }) {
   const { period, incomeByCategory, expenseByCategory, totalIncome, totalExpense, saldo, churchInfo, fundBalances } = data;
   const monthName = getMonthName(period.month);
   const daysInMonth = new Date(period.year, period.month, 0).getDate();
@@ -103,6 +113,7 @@ export default function ReportPDF({ data }: { data: ReportData }) {
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
+          {logoUrl && <Image src={logoUrl} style={styles.logo} />}
           <Text style={styles.title}>LAPORAN KEUANGAN</Text>
           <Text style={styles.subtitle}>
             PERIODE 1 - {daysInMonth} {monthName.toUpperCase()} {period.year}
@@ -110,9 +121,9 @@ export default function ReportPDF({ data }: { data: ReportData }) {
           <Text style={styles.churchName}>{churchInfo.church_name || "GBI JONGGOL RAYA"}</Text>
         </View>
 
-        {/* Saldo Pindahan */}
+        {/* Saldo Bulan Lalu */}
         <View style={styles.saldoPindahan}>
-          <Text style={{ fontWeight: 700, color: colors.gray700 }}>SALDO PINDAHAN</Text>
+          <Text style={{ fontWeight: 700, color: colors.gray700 }}>SALDO BULAN LALU</Text>
           <Text style={{ fontWeight: 700, fontSize: 11 }}>Rp {formatNumber(period.saldoPindahan)}</Text>
         </View>
 
@@ -136,7 +147,7 @@ export default function ReportPDF({ data }: { data: ReportData }) {
             </View>
             {entries.map((entry, idx) => (
               <View key={idx} style={styles.row}>
-                <Text style={[styles.colDate, { color: colors.gray600 }]}>{entry.date}</Text>
+                <Text style={[styles.colDate, { color: colors.gray600 }]}>{formatDateID(entry.date)}</Text>
                 <Text style={[styles.colDesc, { color: colors.gray600 }]}>{entry.description}</Text>
                 <Text style={styles.colAmount}>Rp {formatNumber(entry.amount)}</Text>
               </View>
@@ -173,7 +184,7 @@ export default function ReportPDF({ data }: { data: ReportData }) {
             </View>
             {entries.map((entry, idx) => (
               <View key={idx} style={styles.row}>
-                <Text style={[styles.colDate, { color: colors.gray600 }]}>{entry.date}</Text>
+                <Text style={[styles.colDate, { color: colors.gray600 }]}>{formatDateID(entry.date)}</Text>
                 <Text style={[styles.colDesc, { color: colors.gray600 }]}>{entry.description}</Text>
                 <Text style={styles.colAmount}>Rp {formatNumber(entry.amount)}</Text>
               </View>
@@ -192,7 +203,7 @@ export default function ReportPDF({ data }: { data: ReportData }) {
 
         {/* SALDO AKHIR */}
         <View style={styles.saldoAkhir}>
-          <Text style={styles.saldoAkhirLabel}>SALDO (Pindahan + Debit - Kredit)</Text>
+          <Text style={styles.saldoAkhirLabel}>SALDO (Bulan Lalu + Debit - Kredit)</Text>
           <Text style={styles.saldoAkhirAmount}>Rp {formatNumber(saldo)}</Text>
         </View>
 
@@ -224,12 +235,10 @@ export default function ReportPDF({ data }: { data: ReportData }) {
           <View style={styles.signatureBlock}>
             <Text style={{ color: colors.gray600 }}>Gembala Sidang,</Text>
             <Text style={styles.signatureName}>{churchInfo.pastor_name || "________________"}</Text>
-            <Text style={styles.signatureTitle}>Gembala</Text>
           </View>
           <View style={styles.signatureBlock}>
             <Text style={{ color: colors.gray600 }}>Bendahara,</Text>
             <Text style={styles.signatureName}>{churchInfo.treasurer_name || "________________"}</Text>
-            <Text style={styles.signatureTitle}>Bendahara</Text>
           </View>
         </View>
       </Page>
