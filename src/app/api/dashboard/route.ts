@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { logError } from "@/lib/logger";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -151,7 +152,8 @@ export async function GET() {
       expenseByCategory,
       topExpenses,
     });
-  } catch {
+  } catch (err) {
+    logError("GET /api/dashboard", err);
     return NextResponse.json({ error: "Gagal memuat dashboard" }, { status: 500 });
   }
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAdmin } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -13,7 +15,8 @@ export async function GET() {
       result[s.key] = s.value;
     });
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    logError("GET /api/settings", err);
     return NextResponse.json({ error: "Gagal mengambil pengaturan" }, { status: 500 });
   }
 }
@@ -38,8 +41,18 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "UPDATE",
+      entity: "ChurchInfo",
+      entityId: "settings",
+      details: `Updated keys: ${Object.keys(body).join(", ")}`,
+    });
+
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logError("PUT /api/settings", err);
     return NextResponse.json({ error: "Gagal menyimpan pengaturan" }, { status: 500 });
   }
 }

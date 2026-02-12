@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { requireAdmin } from "@/lib/auth";
+import { getDbPath } from "@/lib/db-path";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
@@ -28,8 +31,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File bukan database SQLite yang valid" }, { status: 400 });
     }
 
-    const dbPath = join(process.cwd(), "prisma", "dev.db");
-    const backupDir = join(process.cwd(), "prisma", "backups");
+    const dbPath = getDbPath();
+    const backupDir = join(dirname(dbPath), "backups");
 
     // Create a backup of the current database before overwriting
     if (!existsSync(backupDir)) {
@@ -47,12 +50,22 @@ export async function POST(req: NextRequest) {
     // Write the uploaded file as the new database
     writeFileSync(dbPath, buffer);
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "RESTORE",
+      entity: "Database",
+      entityId: `pre_restore_${timestamp}.db`,
+      details: `Restore database, auto-backup: pre_restore_${timestamp}.db`,
+    });
+
     return NextResponse.json({
       success: true,
       message: "Database berhasil dipulihkan",
       autoBackup: `pre_restore_${timestamp}.db`,
     });
-  } catch {
+  } catch (err) {
+    logError("POST /api/restore", err);
     return NextResponse.json({ error: "Gagal memulihkan database" }, { status: 500 });
   }
 }

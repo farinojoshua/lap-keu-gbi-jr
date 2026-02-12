@@ -34,40 +34,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-
-interface WeeklyEntry {
-  date: string;
-  attendance: number;
-  persembahan: number;
-}
-
-interface DashboardData {
-  currentMonth: number;
-  currentYear: number;
-  isLocked: boolean;
-  saldoPindahan: number;
-  totalIncome: number;
-  totalExpense: number;
-  saldo: number;
-  avgAttendance: number;
-  totalPersembahan: number;
-  weeklyData: WeeklyEntry[];
-  trend: { month: number; year: number; income: number; expense: number }[];
-  prevMonth: {
-    month: number;
-    year: number;
-    income: number;
-    expense: number;
-  };
-  incomeByCategory: Record<string, number>;
-  expenseByCategory: Record<string, number>;
-  topExpenses: {
-    description: string;
-    category: string;
-    amount: number;
-    date: string;
-  }[];
-}
+import type { DashboardData } from "@/types";
 
 function DeltaBadge({
   current,

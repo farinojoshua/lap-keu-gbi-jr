@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { expenseEntrySchema, expenseUpdateSchema } from "@/lib/validations";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 
 const LOCKED_MSG = "Periode sudah ditutup, data tidak bisa diubah";
 
@@ -31,7 +33,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(entries);
-  } catch {
+  } catch (err) {
+    logError("GET /api/expense", err);
     return NextResponse.json({ error: "Gagal mengambil data pengeluaran" }, { status: 500 });
   }
 }
@@ -51,6 +54,16 @@ export async function POST(req: NextRequest) {
       const entries = await prisma.$transaction(
         validated.map((entry) => prisma.expenseEntry.create({ data: entry }))
       );
+      for (const entry of entries) {
+        await auditLog({
+          userId: auth.user.id,
+          userName: auth.user.name,
+          action: "CREATE",
+          entity: "ExpenseEntry",
+          entityId: entry.id,
+          details: `${entry.category} - Rp ${entry.amount}`,
+        });
+      }
       return NextResponse.json(entries);
     }
 
@@ -59,11 +72,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: LOCKED_MSG }, { status: 403 });
     }
     const entry = await prisma.expenseEntry.create({ data: validated });
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "CREATE",
+      entity: "ExpenseEntry",
+      entityId: entry.id,
+      details: `${validated.category} - Rp ${validated.amount}`,
+    });
     return NextResponse.json(entry);
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
+    logError("POST /api/expense", err);
     return NextResponse.json({ error: "Gagal menyimpan pengeluaran" }, { status: 500 });
   }
 }
@@ -89,11 +111,21 @@ export async function PUT(req: NextRequest) {
       data,
     });
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "UPDATE",
+      entity: "ExpenseEntry",
+      entityId: id,
+      details: `Updated expense entry`,
+    });
+
     return NextResponse.json(entry);
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
+    logError("PUT /api/expense", err);
     return NextResponse.json({ error: "Gagal mengubah pengeluaran" }, { status: 500 });
   }
 }
@@ -119,8 +151,16 @@ export async function DELETE(req: NextRequest) {
     }
 
     await prisma.expenseEntry.delete({ where: { id } });
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "DELETE",
+      entity: "ExpenseEntry",
+      entityId: id,
+    });
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logError("DELETE /api/expense", err);
     return NextResponse.json({ error: "Gagal menghapus pengeluaran" }, { status: 500 });
   }
 }

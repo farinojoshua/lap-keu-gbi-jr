@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { periodUpdateSchema } from "@/lib/validations";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth();
@@ -33,7 +35,8 @@ export async function GET(req: NextRequest) {
       orderBy: [{ year: "desc" }, { month: "desc" }],
     });
     return NextResponse.json(periods);
-  } catch {
+  } catch (err) {
+    logError("GET /api/periods", err);
     return NextResponse.json({ error: "Gagal mengambil data periode" }, { status: 500 });
   }
 }
@@ -52,11 +55,21 @@ export async function PUT(req: NextRequest) {
       include: { fundBalances: true },
     });
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "UPDATE",
+      entity: "Period",
+      entityId: id,
+      details: `Updated period`,
+    });
+
     return NextResponse.json(period);
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
+    logError("PUT /api/periods", err);
     return NextResponse.json({ error: "Gagal mengubah periode" }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calculateSaldoPindahan } from "@/lib/saldo";
 import { requireAuth } from "@/lib/auth";
+import { logError } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth();
@@ -90,7 +91,8 @@ export async function GET(req: NextRequest) {
       churchInfo,
       fundBalances,
     });
-  } catch {
+  } catch (err) {
+    logError("GET /api/report", err);
     return NextResponse.json({ error: "Gagal memuat laporan" }, { status: 500 });
   }
 }

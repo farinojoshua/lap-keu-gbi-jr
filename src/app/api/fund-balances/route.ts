@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { fundBalanceSchema } from "@/lib/validations";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth();
@@ -20,7 +22,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(balances);
-  } catch {
+  } catch (err) {
+    logError("GET /api/fund-balances", err);
     return NextResponse.json({ error: "Gagal mengambil data saldo dana" }, { status: 500 });
   }
 }
@@ -39,11 +42,21 @@ export async function PUT(req: NextRequest) {
       create: { periodId, fundType, balance, note },
     });
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "UPDATE",
+      entity: "FundBalance",
+      entityId: result.id,
+      details: `${fundType} - Rp ${balance}`,
+    });
+
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
+    logError("PUT /api/fund-balances", err);
     return NextResponse.json({ error: "Gagal menyimpan saldo dana" }, { status: 500 });
   }
 }

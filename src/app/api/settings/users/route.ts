@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { userCreateSchema, userUpdateSchema } from "@/lib/validations";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
@@ -14,7 +16,8 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
     return NextResponse.json(users);
-  } catch {
+  } catch (err) {
+    logError("GET /api/settings/users", err);
     return NextResponse.json({ error: "Gagal mengambil data user" }, { status: 500 });
   }
 }
@@ -38,11 +41,21 @@ export async function POST(req: NextRequest) {
       select: { id: true, username: true, name: true, role: true },
     });
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "CREATE",
+      entity: "User",
+      entityId: user.id,
+      details: `Created user: ${username} (${role})`,
+    });
+
     return NextResponse.json(user);
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
+    logError("POST /api/settings/users", err);
     return NextResponse.json({ error: "Gagal membuat user" }, { status: 500 });
   }
 }
@@ -67,11 +80,21 @@ export async function PUT(req: NextRequest) {
       select: { id: true, username: true, name: true, role: true },
     });
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "UPDATE",
+      entity: "User",
+      entityId: id,
+      details: `Updated user: ${user.username}`,
+    });
+
     return NextResponse.json(user);
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
+    logError("PUT /api/settings/users", err);
     return NextResponse.json({ error: "Gagal mengubah user" }, { status: 500 });
   }
 }
@@ -95,8 +118,17 @@ export async function DELETE(req: NextRequest) {
     }
 
     await prisma.user.delete({ where: { id } });
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "DELETE",
+      entity: "User",
+      entityId: id,
+      details: `Deleted user: ${userToDelete?.username}`,
+    });
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logError("DELETE /api/settings/users", err);
     return NextResponse.json({ error: "Gagal menghapus user" }, { status: 500 });
   }
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+import { auditLog } from "@/lib/audit";
 import bcrypt from "bcryptjs";
 
 export async function POST() {
@@ -64,11 +66,21 @@ export async function POST() {
       await prisma.komselGroup.create({ data: { name } });
     }
 
+    await auditLog({
+      userId: auth.user.id,
+      userName: auth.user.name,
+      action: "RESET",
+      entity: "Database",
+      entityId: "all",
+      details: "Reset database ke data awal",
+    });
+
     return NextResponse.json({
       success: true,
       message: "Database berhasil di-reset ke data awal",
     });
-  } catch {
+  } catch (err) {
+    logError("POST /api/reset", err);
     return NextResponse.json({ error: "Gagal mereset database" }, { status: 500 });
   }
 }

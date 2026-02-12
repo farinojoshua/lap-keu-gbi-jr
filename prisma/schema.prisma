@@ -91,3 +91,14 @@ model ChurchInfo {
   key   String @unique
   value String
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  userName  String   @default("")
+  action    String
+  entity    String
+  entityId  String
+  details   String   @default("")
+  createdAt DateTime @default(now())
+}
