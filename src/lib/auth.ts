@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import { env } from "./env";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -57,7 +56,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  secret: env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET,
 };
 
 // ---------- Auth helpers for API routes ----------
