@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   formatRupiah,
   getMonthName,
@@ -17,7 +16,6 @@ import {
   TrendingDown,
   Wallet,
   Users,
-  Plus,
   Lock,
   Unlock,
   ArrowUpRight,
@@ -267,20 +265,6 @@ export default function DashboardPage() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
-          <Link
-            href="/pemasukan"
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Pemasukan
-          </Link>
-          <Link
-            href="/pengeluaran"
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Pengeluaran
-          </Link>
         </div>
       </div>
 
