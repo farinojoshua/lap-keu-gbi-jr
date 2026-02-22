@@ -418,7 +418,7 @@ export default function DashboardPage() {
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} width={35} allowDecimals={false} />
               <Tooltip
-                formatter={(value: number, name: string) => [`${value} orang`, name]}
+                formatter={(value: number | string) => [`${value} orang`]}
                 labelStyle={{ fontWeight: "bold" }}
               />
               <Legend />
