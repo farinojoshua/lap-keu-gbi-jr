@@ -1,0 +1,13 @@
+FROM node:20-slim
+
+RUN apt-get update -y && \
+    apt-get install -y python3 make g++ openssl curl ca-certificates gnupg && \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get update -y && \
+    apt-get install -y postgresql-client-16 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+CMD ["sh", "-c", "npm install && npx prisma generate && npx prisma migrate deploy && node docker-seed.js 2>/dev/null || true && npm run dev"]

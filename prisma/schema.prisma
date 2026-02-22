@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -101,4 +101,13 @@ model AuditLog {
   entityId  String
   details   String   @default("")
   createdAt DateTime @default(now())
+}
+
+model Category {
+  id    String @id @default(cuid())
+  type  String // "expense" | "income_other"
+  key   String
+  label String
+
+  @@unique([type, key])
 }

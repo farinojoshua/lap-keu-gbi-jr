@@ -65,6 +65,9 @@ export async function GET(req: NextRequest) {
 
     const totalIncome = period.incomeEntries.reduce((s, e) => s + e.amount, 0);
     const totalExpense = period.expenseEntries.reduce((s, e) => s + e.amount, 0);
+    const totalKomsel = period.incomeEntries
+      .filter((e) => e.category === "komsel")
+      .reduce((s, e) => s + e.amount, 0);
 
     const churchInfo: Record<string, string> = {};
     churchInfoRows.forEach((r) => { churchInfo[r.key] = r.value; });
@@ -88,6 +91,7 @@ export async function GET(req: NextRequest) {
       totalIncome,
       totalExpense,
       saldo: saldoPindahan + totalIncome - totalExpense,
+      totalKomsel,
       churchInfo,
       fundBalances,
     });

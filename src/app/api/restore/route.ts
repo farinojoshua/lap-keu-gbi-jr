@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
 import { requireAdmin } from "@/lib/auth";
-import { getDbPath } from "@/lib/db-path";
 import { logError } from "@/lib/logger";
 import { auditLog } from "@/lib/audit";
+import { spawn } from "child_process";
+
+const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
@@ -15,57 +15,82 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "File diperlukan" }, { status: 400 });
+      return NextResponse.json({ error: "File tidak ditemukan" }, { status: 400 });
     }
 
-    // Limit file size to 50MB
-    const MAX_SIZE = 50 * 1024 * 1024;
+    if (!file.name.endsWith(".sql")) {
+      return NextResponse.json({ error: "File harus berekstensi .sql" }, { status: 400 });
+    }
+
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: "Ukuran file melebihi batas 50MB" }, { status: 400 });
+      return NextResponse.json({ error: "Ukuran file melebihi batas 100MB" }, { status: 400 });
     }
 
-    // Validate it's a SQLite file by checking the header
     const buffer = Buffer.from(await file.arrayBuffer());
-    const header = buffer.subarray(0, 16).toString("utf-8");
-    if (!header.startsWith("SQLite format 3")) {
-      return NextResponse.json({ error: "File bukan database SQLite yang valid" }, { status: 400 });
+
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      return NextResponse.json({ error: "DATABASE_URL tidak dikonfigurasi" }, { status: 500 });
     }
 
-    const dbPath = getDbPath();
-    const backupDir = join(dirname(dbPath), "backups");
+    const parsed = new URL(dbUrl);
+    const pgEnv = {
+      ...process.env,
+      PGPASSWORD: decodeURIComponent(parsed.password),
+      PGHOST: parsed.hostname,
+      PGPORT: parsed.port || "5432",
+      PGUSER: parsed.username,
+      PGDATABASE: parsed.pathname.replace(/^\//, ""),
+    };
 
-    // Create a backup of the current database before overwriting
-    if (!existsSync(backupDir)) {
-      mkdirSync(backupDir, { recursive: true });
-    }
+    await new Promise<void>((resolve, reject) => {
+      const psql = spawn("psql", ["-v", "ON_ERROR_STOP=1"], {
+        env: pgEnv,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
 
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
-    const autoBackupPath = join(backupDir, `pre_restore_${timestamp}.db`);
+      let stderr = "";
 
-    if (existsSync(dbPath)) {
-      copyFileSync(dbPath, autoBackupPath);
-    }
+      psql.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
 
-    // Write the uploaded file as the new database
-    writeFileSync(dbPath, buffer);
+      psql.on("close", (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`psql exited with code ${code}: ${stderr}`));
+        }
+      });
+
+      psql.on("error", (err) => {
+        reject(err);
+      });
+
+      psql.stdin.write(buffer);
+      psql.stdin.end();
+    });
 
     await auditLog({
       userId: auth.user.id,
       userName: auth.user.name,
       action: "RESTORE",
       entity: "Database",
-      entityId: `pre_restore_${timestamp}.db`,
-      details: `Restore database, auto-backup: pre_restore_${timestamp}.db`,
+      entityId: "psql",
+      details: `Restore dari file: ${file.name}`,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Database berhasil dipulihkan",
-      autoBackup: `pre_restore_${timestamp}.db`,
-    });
+    return NextResponse.json({ success: true, message: "Database berhasil di-restore" });
   } catch (err) {
+    const nodeErr = err as NodeJS.ErrnoException;
+    if (nodeErr?.code === "ENOENT") {
+      return NextResponse.json(
+        { error: "psql tidak ditemukan. Pastikan postgresql-client terinstall." },
+        { status: 500 }
+      );
+    }
     logError("POST /api/restore", err);
-    return NextResponse.json({ error: "Gagal memulihkan database" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Gagal memulihkan database";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

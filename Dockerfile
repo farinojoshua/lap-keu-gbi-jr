@@ -1,8 +1,9 @@
 FROM node:20-slim AS base
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y openssl postgresql-client && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies only when needed
 FROM base AS deps
+RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -36,8 +37,6 @@ COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY --from=builder /app/docker-start.sh ./docker-start.sh
 COPY --from=builder /app/docker-seed.js ./docker-seed.js
 
-# Create directory for SQLite database
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 RUN chmod +x /app/docker-start.sh
 
 USER nextjs

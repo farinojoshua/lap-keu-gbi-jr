@@ -1,16 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
   try {
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
+    const { searchParams } = new URL(req.url);
+    const currentMonth = Number(searchParams.get("month")) || now.getMonth() + 1;
+    const currentYear = Number(searchParams.get("year")) || now.getFullYear();
 
     // Get current period
     let currentPeriod = await prisma.period.findUnique({
@@ -104,12 +105,15 @@ export async function GET() {
       .filter((e) => e.category === "persembahan")
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const weeklyMap = new Map<string, { date: string; attendance: number; persembahan: number }>();
+    const weeklyMap = new Map<string, { date: string; attendance: number; smAttendance: number; persembahan: number }>();
     for (const e of persembahanEntries) {
-      const existing = weeklyMap.get(e.date) || { date: e.date, attendance: 0, persembahan: 0 };
+      const existing = weeklyMap.get(e.date) || { date: e.date, attendance: 0, smAttendance: 0, persembahan: 0 };
       existing.persembahan += e.amount;
       if (e.subcategory === "kantong_ungu" && e.attendance) {
         existing.attendance = e.attendance;
+      }
+      if (e.subcategory === "sekolah_minggu" && e.attendance) {
+        existing.smAttendance = e.attendance;
       }
       weeklyMap.set(e.date, existing);
     }

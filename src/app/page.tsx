@@ -8,6 +8,7 @@ import {
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
   formatDateID,
+  generateYears,
 } from "@/lib/utils";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import {
@@ -27,6 +28,8 @@ import {
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -111,12 +114,17 @@ function HorizontalBar({
 }
 
 export default function DashboardPage() {
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    setLoading(true);
+    setError(false);
+    fetch(`/api/dashboard?month=${month}&year=${year}`)
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -124,7 +132,7 @@ export default function DashboardPage() {
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [month, year]);
 
   if (loading) {
     return (
@@ -240,7 +248,25 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          <select
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+            className="border border-gray-300 rounded-lg px-4 py-2.5 text-base"
+          >
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
+            ))}
+          </select>
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="border border-gray-300 rounded-lg px-4 py-2.5 text-base"
+          >
+            {generateYears().map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
           <Link
             href="/pemasukan"
             className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
@@ -367,64 +393,61 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Weekly Attendance & Persembahan */}
+      {/* Weekly Attendance Chart */}
       {data.weeklyData.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border p-5">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-1">
             <Users className="w-5 h-5 text-indigo-500" />
             <h2 className="text-lg font-semibold text-gray-800">
-              Kehadiran & Persembahan Mingguan
+              Kehadiran Minggu ke Minggu
             </h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {data.weeklyData.map((w, i) => (
-              <div
-                key={w.date}
-                className="bg-gray-50 rounded-lg p-4 text-center border"
-              >
-                <p className="text-xs text-gray-400 font-medium mb-1">
-                  Minggu {i + 1}
-                </p>
-                <p className="text-xs text-gray-500 mb-2">
-                  {formatDateID(w.date)}
-                </p>
-                {w.attendance > 0 && (
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {w.attendance}
-                    <span className="text-xs font-normal text-gray-400 ml-1">
-                      org
-                    </span>
-                  </p>
-                )}
-                <p className="text-sm font-semibold text-amber-600 mt-1">
-                  {formatRupiah(w.persembahan)}
-                </p>
-              </div>
-            ))}
-            {/* Average summary */}
-            <div className="bg-indigo-50 rounded-lg p-4 text-center border border-indigo-200">
-              <p className="text-xs text-indigo-400 font-medium mb-1">
-                Rata-rata
-              </p>
-              <p className="text-xs text-indigo-400 mb-2">per minggu</p>
-              {data.avgAttendance > 0 && (
-                <p className="text-2xl font-bold text-indigo-600">
-                  {data.avgAttendance}
-                  <span className="text-xs font-normal text-indigo-400 ml-1">
-                    org
-                  </span>
-                </p>
-              )}
-              <p className="text-sm font-semibold text-amber-600 mt-1">
-                {formatRupiah(
-                  data.weeklyData.length > 0
-                    ? Math.round(
-                        data.totalPersembahan / data.weeklyData.length
-                      )
-                    : 0
-                )}
-              </p>
-            </div>
+          <p className="text-sm text-gray-400 mb-4">
+            Ibadah umum & Sekolah Minggu — {data.weeklyData.length} minggu
+          </p>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart
+              data={data.weeklyData.map((w, i) => ({
+                name: `Mg ${i + 1}\n${formatDateID(w.date)}`,
+                "Ibadah Umum": w.attendance || null,
+                "Sekolah Minggu": w.smAttendance || null,
+              }))}
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} width={35} allowDecimals={false} />
+              <Tooltip
+                formatter={(value: number, name: string) => [`${value} orang`, name]}
+                labelStyle={{ fontWeight: "bold" }}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="Ibadah Umum"
+                stroke="#6366f1"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="Sekolah Minggu"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          {/* Summary row */}
+          <div className="flex gap-6 mt-3 pt-3 border-t text-sm text-gray-600">
+            {data.avgAttendance > 0 && (
+              <span>Rata-rata ibadah: <strong className="text-indigo-600">{data.avgAttendance} org</strong></span>
+            )}
+            <span>Total persembahan: <strong className="text-amber-600">{formatRupiah(data.totalPersembahan)}</strong></span>
           </div>
         </div>
       )}

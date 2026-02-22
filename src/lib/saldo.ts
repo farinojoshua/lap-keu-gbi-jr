@@ -21,7 +21,11 @@ export async function calculateSaldoPindahan(month: number, year: number): Promi
   });
 
   if (previousPeriods.length === 0) {
-    return 0;
+    // Tidak ada periode sebelumnya — ambil saldoPindahan dari periode itu sendiri
+    const currentPeriod = await prisma.period.findUnique({
+      where: { month_year: { month, year } },
+    });
+    return currentPeriod?.saldoPindahan ?? 0;
   }
 
   // Mulai dari saldoPindahan period pertama (dari "Saldo Awal" di pengaturan)

@@ -2,6 +2,12 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatRupiah, getMonthName, EXPENSE_CATEGORIES, formatDateID, generateYears } from "@/lib/utils";
+
+interface CategoryItem {
+  id: string;
+  key: string;
+  label: string;
+}
 import { showSuccess, showConfirmDelete, showError, showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
 import { SkeletonTable } from "@/components/ui/Skeleton";
@@ -55,9 +61,11 @@ export default function PengeluaranPage() {
   const [ftName, setFtName] = useState("");
   const [ftAmount, setFtAmount] = useState("");
 
+  const [expenseCats, setExpenseCats] = useState<CategoryItem[]>([]);
+
   // Manual form
   const [manualDate, setManualDate] = useState("");
-  const [manualCategory, setManualCategory] = useState("konsumsi");
+  const [manualCategory, setManualCategory] = useState("");
   const [manualDesc, setManualDesc] = useState("");
   const [manualAmount, setManualAmount] = useState("");
 
@@ -74,12 +82,16 @@ export default function PengeluaranPage() {
       setPeriodId(period.id);
       setIsLocked(period.isLocked);
 
-      const [entriesData, templatesData] = await Promise.all([
+      const [entriesData, templatesData, catsData] = await Promise.all([
         fetch(`/api/expense?periodId=${period.id}`).then((r) => r.json()),
         fetch("/api/expense/templates").then((r) => r.json()),
+        fetch("/api/settings/categories?type=expense").then((r) => r.json()),
       ]);
       setEntries(entriesData);
       setTemplates(templatesData);
+      const cats: CategoryItem[] = Array.isArray(catsData) ? catsData : [];
+      setExpenseCats(cats);
+      setManualCategory((prev) => prev || cats[0]?.key || "");
     } catch {
       showError("Gagal memuat data. Periksa koneksi Anda.");
     } finally {
@@ -247,7 +259,7 @@ export default function PengeluaranPage() {
         (e) =>
           e.description.toLowerCase().includes(q) ||
           e.category.toLowerCase().includes(q) ||
-          (EXPENSE_CATEGORIES[e.category] || "").toLowerCase().includes(q) ||
+          (expenseCats.find((c) => c.key === e.category)?.label || EXPENSE_CATEGORIES[e.category] || "").toLowerCase().includes(q) ||
           e.date.includes(q) ||
           formatDateID(e.date).toLowerCase().includes(q)
       );
@@ -434,8 +446,8 @@ export default function PengeluaranPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">Kategori</label>
                   <select required value={manualCategory} onChange={(e) => setManualCategory(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base">
-                    {Object.entries(EXPENSE_CATEGORIES).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
+                    {expenseCats.map((c) => (
+                      <option key={c.key} value={c.key}>{c.label}</option>
                     ))}
                   </select>
                 </div>
@@ -509,7 +521,7 @@ export default function PengeluaranPage() {
                         <td className="px-4 py-2">
                           <input type="date" min={dateMin} max={dateMax} value={editDate} onChange={(e) => setEditDate(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full" />
                         </td>
-                        <td className="px-4 py-2 text-gray-600">{EXPENSE_CATEGORIES[entry.category] || entry.category}</td>
+                        <td className="px-4 py-2 text-gray-600">{expenseCats.find((c) => c.key === entry.category)?.label || EXPENSE_CATEGORIES[entry.category] || entry.category}</td>
                         <td className="px-4 py-2">
                           <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full" />
                         </td>

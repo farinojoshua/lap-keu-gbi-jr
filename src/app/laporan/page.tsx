@@ -8,7 +8,6 @@ import {
   getMonthName,
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
-  FUND_TYPES,
   generateYears,
   formatDateID,
 } from "@/lib/utils";
@@ -55,6 +54,7 @@ interface ReportData {
   totalIncome: number;
   totalExpense: number;
   saldo: number;
+  totalKomsel: number;
   churchInfo: Record<string, string>;
   fundBalances: Record<string, number>;
 }
@@ -72,7 +72,6 @@ export default function LaporanPage() {
   const [editSaldo, setEditSaldo] = useState(false);
   const [saldoRekening, setSaldoRekening] = useState("");
   const [saldoCash, setSaldoCash] = useState("");
-  const [fundEdits, setFundEdits] = useState<Record<string, string>>({});
 
   const [error, setError] = useState(false);
 
@@ -86,11 +85,6 @@ export default function LaporanPage() {
       setData(reportData);
       setSaldoRekening(String(reportData.period.saldoRekening));
       setSaldoCash(String(reportData.period.saldoCash));
-      const fe: Record<string, string> = {};
-      Object.keys(FUND_TYPES).forEach((key) => {
-        fe[key] = String(reportData.fundBalances[key] || 0);
-      });
-      setFundEdits(fe);
     } catch {
       setError(true);
       setData(null);
@@ -134,19 +128,6 @@ export default function LaporanPage() {
         saldoCash: Number(saldoCash),
       }),
     });
-
-    // Update fund balances
-    for (const [fundType, balance] of Object.entries(fundEdits)) {
-      await fetch("/api/fund-balances", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          periodId: data.period.id,
-          fundType,
-          balance: Number(balance),
-        }),
-      });
-    }
 
     setEditSaldo(false);
     loadData();
@@ -409,12 +390,14 @@ export default function LaporanPage() {
               )}
             </div>
             <div className="space-y-2 text-base">
-              <div className="flex justify-between py-1 border-b">
+              {/* Kas Tersedia */}
+              <div className="flex justify-between py-1 border-b font-semibold">
                 <span>Kas Tersedia</span>
-                <span className="font-semibold">{formatRupiah(data.saldo)}</span>
+                <span>{formatRupiah(data.saldo)}</span>
               </div>
-              <div className="flex justify-between py-1 border-b items-center">
-                <span>Saldo Rekening</span>
+              {/* Sub-baris: Saldo Rekening */}
+              <div className="flex justify-between py-1 border-b items-center pl-5 text-gray-600">
+                <span>- Saldo Rekening</span>
                 {editSaldo ? (
                   <NumericInput
                     value={saldoRekening}
@@ -425,8 +408,9 @@ export default function LaporanPage() {
                   <span>{formatRupiah(data.period.saldoRekening)}</span>
                 )}
               </div>
-              <div className="flex justify-between py-1 border-b items-center">
-                <span>Saldo Cash</span>
+              {/* Sub-baris: Saldo Cash */}
+              <div className="flex justify-between py-1 border-b items-center pl-5 text-gray-600">
+                <span>- Saldo Cash</span>
                 {editSaldo ? (
                   <NumericInput
                     value={saldoCash}
@@ -437,20 +421,11 @@ export default function LaporanPage() {
                   <span>{formatRupiah(data.period.saldoCash)}</span>
                 )}
               </div>
-              {Object.entries(FUND_TYPES).map(([key, label]) => (
-                <div key={key} className="flex justify-between py-1 border-b items-center">
-                  <span>{label}</span>
-                  {editSaldo ? (
-                    <NumericInput
-                      value={fundEdits[key] || "0"}
-                      onChange={(val) => setFundEdits((prev) => ({ ...prev, [key]: val }))}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-44 text-right"
-                    />
-                  ) : (
-                    <span>{formatRupiah(data.fundBalances[key] || 0)}</span>
-                  )}
-                </div>
-              ))}
+              {/* Kas Komsel */}
+              <div className="flex justify-between py-1 border-b">
+                <span>Kas Komsel</span>
+                <span>{formatRupiah(data.totalKomsel)}</span>
+              </div>
             </div>
           </div>
 

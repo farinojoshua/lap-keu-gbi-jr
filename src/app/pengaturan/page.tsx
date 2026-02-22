@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { formatRupiah, generateYears } from "@/lib/utils";
+import { formatRupiah, getMonthName } from "@/lib/utils";
 import { showSuccess, showError, showConfirmDelete, showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Download, Upload, Database, RotateCcw } from "lucide-react";
+import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Database, RotateCcw, Download, Upload, Tag, Check, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Template {
@@ -30,7 +30,13 @@ interface User {
   role: string;
 }
 
-type Tab = "church" | "templates" | "komsel" | "users" | "saldo" | "backup";
+type Tab = "church" | "templates" | "komsel" | "users" | "saldo" | "backup" | "kategori";
+
+interface CategoryItem {
+  id: string;
+  key: string;
+  label: string;
+}
 
 export default function PengaturanPage() {
   const { data: session, status } = useSession();
@@ -68,10 +74,27 @@ export default function PengaturanPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
+  // Backup / Restore / Import
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [sqliteFile, setSqliteFile] = useState<File | null>(null);
+  const [sqliteLoading, setSqliteLoading] = useState(false);
+
+  // Categories
+  const [expenseCats, setExpenseCats] = useState<CategoryItem[]>([]);
+  const [incomeCats, setIncomeCats] = useState<CategoryItem[]>([]);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatLabel, setEditCatLabel] = useState("");
+  const [newExpKey, setNewExpKey] = useState("");
+  const [newExpLabel, setNewExpLabel] = useState("");
+  const [newIncKey, setNewIncKey] = useState("");
+  const [newIncLabel, setNewIncLabel] = useState("");
+
   // Saldo awal
-  const [saldoMonth, setSaldoMonth] = useState(1);
-  const [saldoYear, setSaldoYear] = useState(2025);
   const [saldoAmount, setSaldoAmount] = useState("");
+  const [firstPeriod, setFirstPeriod] = useState<{ id: string; month: number; year: number; saldoPindahan: number } | null>(null);
+  const [saldoEditing, setSaldoEditing] = useState(false);
 
   const isAdmin = role === "admin";
 
@@ -95,6 +118,9 @@ export default function PengaturanPage() {
       const fetches: Promise<unknown>[] = [
         fetch("/api/expense/templates").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
         fetch("/api/settings/komsel").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
+        fetch("/api/periods").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
+        fetch("/api/settings/categories?type=expense").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
+        fetch("/api/settings/categories?type=income_other").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
       ];
 
       if (isAdmin) {
@@ -108,12 +134,26 @@ export default function PengaturanPage() {
       setTemplates(Array.isArray(results[0]) ? results[0] as Template[] : []);
       setKomselGroups(Array.isArray(results[1]) ? results[1] as KomselGroup[] : []);
 
-      if (isAdmin && results.length > 2) {
-        const settings = results[2] as Record<string, string>;
+      // Set periode pertama (urutan asc by year/month — API return desc, jadi ambil index terakhir)
+      type PeriodRaw = { id: string; month: number; year: number; saldoPindahan: number };
+      const periodsRaw = Array.isArray(results[2]) ? (results[2] as PeriodRaw[]) : [];
+      if (periodsRaw.length > 0) {
+        const oldest = periodsRaw[periodsRaw.length - 1];
+        setFirstPeriod(oldest);
+        setSaldoAmount(String(oldest.saldoPindahan || ""));
+      }
+
+      const eCats = Array.isArray(results[3]) ? results[3] as CategoryItem[] : [];
+      setExpenseCats(eCats);
+      setNewTplCategory((prev) => prev || eCats[0]?.key || "");
+      setIncomeCats(Array.isArray(results[4]) ? results[4] as CategoryItem[] : []);
+
+      if (isAdmin && results.length > 5) {
+        const settings = results[5] as Record<string, string>;
         setChurchName(settings.church_name || "");
         setPastorName(settings.pastor_name || "");
         setTreasurerName(settings.treasurer_name || "");
-        setUsers(Array.isArray(results[3]) ? results[3] as User[] : []);
+        setUsers(Array.isArray(results[6]) ? results[6] as User[] : []);
       }
     } catch {
       setLoadError(true);
@@ -254,26 +294,90 @@ export default function PengaturanPage() {
     showSuccess("User berhasil dihapus");
   }
 
+  async function confirmEditSaldo() {
+    const result = await showConfirmAction(
+      "Ubah Saldo Awal?",
+      "Mengubah saldo awal akan mempengaruhi semua perhitungan keuangan dari awal pencatatan."
+    );
+    if (result.isConfirmed) setSaldoEditing(true);
+  }
+
   async function setSaldoAwal() {
     if (!saldoAmount) return;
-    const periodRes = await fetch(`/api/periods?month=${saldoMonth}&year=${saldoYear}`);
-    const period = await periodRes.json();
+
+    let periodId = firstPeriod?.id;
+
+    // Kalau belum ada periode sama sekali, buat periode bulan ini dulu
+    if (!periodId) {
+      const now = new Date();
+      const res = await fetch(`/api/periods?month=${now.getMonth() + 1}&year=${now.getFullYear()}`);
+      const newPeriod = await res.json();
+      periodId = newPeriod.id;
+      setFirstPeriod({ id: newPeriod.id, month: newPeriod.month, year: newPeriod.year, saldoPindahan: Number(saldoAmount) });
+    }
 
     await fetch("/api/periods", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        id: period.id,
+        id: periodId,
         saldoPindahan: Number(saldoAmount),
       }),
     });
-    showSuccess(`Saldo bulan lalu berhasil di-set: ${formatRupiah(Number(saldoAmount))}`);
+
+    setFirstPeriod((prev) => prev ? { ...prev, saldoPindahan: Number(saldoAmount) } : prev);
+    setSaldoEditing(false);
+    showSuccess(`Saldo awal berhasil disimpan: ${formatRupiah(Number(saldoAmount))}`);
+  }
+
+  async function addCategory(type: "expense" | "income_other", key: string, label: string, resetFn: () => void) {
+    if (!key || !label) return;
+    const res = await fetch("/api/settings/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, key, label }),
+    });
+    const data = await res.json();
+    if (data.error) { showError(data.error); return; }
+    const cats = await fetch(`/api/settings/categories?type=${type}`).then((r) => r.json());
+    if (type === "expense") setExpenseCats(cats);
+    else setIncomeCats(cats);
+    resetFn();
+    showSuccess("Kategori berhasil ditambahkan");
+  }
+
+  async function saveCatLabel(id: string, type: "expense" | "income_other") {
+    if (!editCatLabel.trim()) return;
+    const res = await fetch("/api/settings/categories", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, label: editCatLabel }),
+    });
+    const data = await res.json();
+    if (data.error) { showError(data.error); return; }
+    const cats = await fetch(`/api/settings/categories?type=${type}`).then((r) => r.json());
+    if (type === "expense") setExpenseCats(cats);
+    else setIncomeCats(cats);
+    setEditingCatId(null);
+    showSuccess("Label berhasil diperbarui");
+  }
+
+  async function deleteCategory(id: string, type: "expense" | "income_other") {
+    const result = await showConfirmDelete();
+    if (!result.isConfirmed) return;
+    const res = await fetch(`/api/settings/categories?id=${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.error) { showError(data.error); return; }
+    if (type === "expense") setExpenseCats((prev) => prev.filter((c) => c.id !== id));
+    else setIncomeCats((prev) => prev.filter((c) => c.id !== id));
+    showSuccess("Kategori berhasil dihapus");
   }
 
   const allTabs: { key: Tab; label: string; icon: LucideIcon; adminOnly?: boolean }[] = [
     { key: "church", label: "Info Gereja", icon: Church, adminOnly: true },
     { key: "templates", label: "Template Pengeluaran", icon: FileSpreadsheet },
-    { key: "komsel", label: "Daftar Komsel", icon: Users2 },
+    { key: "komsel", label: "Daftar Komsel", icon: Users2, adminOnly: true },
+    { key: "kategori", label: "Kategori", icon: Tag, adminOnly: true },
     { key: "users", label: "Pengguna", icon: UserCog, adminOnly: true },
     { key: "saldo", label: "Saldo Awal", icon: Banknote },
     { key: "backup", label: "Backup", icon: Database, adminOnly: true },
@@ -389,7 +493,11 @@ export default function PengaturanPage() {
                         {editingTplId === t.id ? (
                           <>
                             <td className="px-3 py-2">
-                              <input type="text" value={editTplCategory} onChange={(e) => setEditTplCategory(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm w-full" />
+                              <select value={editTplCategory} onChange={(e) => setEditTplCategory(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm w-full">
+                                {expenseCats.map((c) => (
+                                  <option key={c.key} value={c.key}>{c.label}</option>
+                                ))}
+                              </select>
                             </td>
                             <td className="px-3 py-2">
                               <input type="text" value={editTplDesc} onChange={(e) => setEditTplDesc(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm w-full" />
@@ -410,7 +518,7 @@ export default function PengaturanPage() {
                           </>
                         ) : (
                           <>
-                            <td className="px-3 py-2">{t.category}</td>
+                            <td className="px-3 py-2">{expenseCats.find((c) => c.key === t.category)?.label || t.category}</td>
                             <td className="px-3 py-2">{t.description}</td>
                             <td className="px-3 py-2 text-right">{formatRupiah(t.defaultAmount)}</td>
                             <td className="px-3 py-2 text-center">
@@ -433,7 +541,11 @@ export default function PengaturanPage() {
               <div className="border-t pt-4">
                 <p className="text-sm font-medium text-gray-600 mb-2">Tambah Template:</p>
                 <div className="flex gap-2 flex-wrap items-end">
-                  <input type="text" value={newTplCategory} onChange={(e) => setNewTplCategory(e.target.value)} placeholder="Kategori" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-40" />
+                  <select value={newTplCategory} onChange={(e) => setNewTplCategory(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-48">
+                    {expenseCats.map((c) => (
+                      <option key={c.key} value={c.key}>{c.label}</option>
+                    ))}
+                  </select>
                   <input type="text" value={newTplDesc} onChange={(e) => setNewTplDesc(e.target.value)} placeholder="Keterangan" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base flex-1 min-w-[200px]" />
                   <NumericInput value={newTplAmount} onChange={setNewTplAmount} placeholder="Jumlah" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-32" />
                   <button onClick={addTemplate} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm">Tambah</button>
@@ -465,6 +577,160 @@ export default function PengaturanPage() {
                   onKeyDown={(e) => e.key === "Enter" && addKomsel()}
                 />
                 <button onClick={addKomsel} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm">Tambah</button>
+              </div>
+            </div>
+          )}
+
+          {/* Kategori */}
+          {activeTab === "kategori" && (
+            <div className="space-y-8">
+              {/* Expense categories */}
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold text-gray-800">Kategori Pengeluaran</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="text-left px-3 py-2 text-xs uppercase tracking-wider font-semibold text-gray-500">Key</th>
+                        <th className="text-left px-3 py-2 text-xs uppercase tracking-wider font-semibold text-gray-500">Label</th>
+                        <th className="text-center px-3 py-2 text-xs uppercase tracking-wider font-semibold text-gray-500">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenseCats.map((c) => (
+                        <tr key={c.id} className="border-t hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-500 font-mono text-xs">{c.key}</td>
+                          {editingCatId === c.id ? (
+                            <>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={editCatLabel}
+                                  onChange={(e) => setEditCatLabel(e.target.value)}
+                                  className="border border-gray-300 rounded-lg px-2 py-1 text-sm w-full"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button onClick={() => saveCatLabel(c.id, "expense")} className="p-1.5 rounded-lg text-green-600 hover:bg-green-50" title="Simpan">
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => setEditingCatId(null)} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100" title="Batal">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-2">{c.label}</td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button onClick={() => { setEditingCatId(c.id); setEditCatLabel(c.label); }} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50" title="Edit">
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => deleteCategory(c.id, "expense")} className="p-1.5 rounded-lg text-red-600 hover:bg-red-50" title="Hapus">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Tambah Kategori Pengeluaran:</p>
+                  <div className="flex gap-2 flex-wrap items-end">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Key (huruf_kecil)</label>
+                      <input type="text" value={newExpKey} onChange={(e) => setNewExpKey(e.target.value)} placeholder="contoh: parkir" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-40" />
+                    </div>
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="block text-xs text-gray-500 mb-1">Label</label>
+                      <input type="text" value={newExpLabel} onChange={(e) => setNewExpLabel(e.target.value)} placeholder="Nama tampil" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-full" />
+                    </div>
+                    <button onClick={() => addCategory("expense", newExpKey, newExpLabel, () => { setNewExpKey(""); setNewExpLabel(""); })} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm">Tambah</button>
+                  </div>
+                </div>
+              </div>
+
+              <hr />
+
+              {/* Income other categories */}
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold text-gray-800">Kategori Pemasukan &ldquo;Lainnya&rdquo;</h3>
+                <p className="text-sm text-gray-500">Kategori untuk tab Lainnya di halaman Pemasukan. Tab Ibadah/Perpuluhan/Komsel/Syukur tidak diubah di sini.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="text-left px-3 py-2 text-xs uppercase tracking-wider font-semibold text-gray-500">Key</th>
+                        <th className="text-left px-3 py-2 text-xs uppercase tracking-wider font-semibold text-gray-500">Label</th>
+                        <th className="text-center px-3 py-2 text-xs uppercase tracking-wider font-semibold text-gray-500">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {incomeCats.map((c) => (
+                        <tr key={c.id} className="border-t hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-500 font-mono text-xs">{c.key}</td>
+                          {editingCatId === c.id ? (
+                            <>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={editCatLabel}
+                                  onChange={(e) => setEditCatLabel(e.target.value)}
+                                  className="border border-gray-300 rounded-lg px-2 py-1 text-sm w-full"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button onClick={() => saveCatLabel(c.id, "income_other")} className="p-1.5 rounded-lg text-green-600 hover:bg-green-50" title="Simpan">
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => setEditingCatId(null)} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100" title="Batal">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-2">{c.label}</td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button onClick={() => { setEditingCatId(c.id); setEditCatLabel(c.label); }} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50" title="Edit">
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => deleteCategory(c.id, "income_other")} className="p-1.5 rounded-lg text-red-600 hover:bg-red-50" title="Hapus">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Tambah Kategori Lainnya:</p>
+                  <div className="flex gap-2 flex-wrap items-end">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Key (huruf_kecil)</label>
+                      <input type="text" value={newIncKey} onChange={(e) => setNewIncKey(e.target.value)} placeholder="contoh: zakat" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-40" />
+                    </div>
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="block text-xs text-gray-500 mb-1">Label</label>
+                      <input type="text" value={newIncLabel} onChange={(e) => setNewIncLabel(e.target.value)} placeholder="Nama tampil" className="border border-gray-300 rounded-lg px-4 py-2.5 text-base w-full" />
+                    </div>
+                    <button onClick={() => addCategory("income_other", newIncKey, newIncLabel, () => { setNewIncKey(""); setNewIncLabel(""); })} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm">Tambah</button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -522,112 +788,219 @@ export default function PengaturanPage() {
           {activeTab === "saldo" && (
             <div className="space-y-4 max-w-md">
               <p className="text-base text-gray-600">
-                Set saldo bulan lalu (awal) untuk memulai pencatatan. Ini biasanya digunakan untuk bulan pertama saat setup aplikasi.
+                Saldo awal digunakan sebagai dasar perhitungan keuangan bulan pertama pencatatan.
               </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">Bulan</label>
-                  <select value={saldoMonth} onChange={(e) => setSaldoMonth(Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base">
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>{i + 1}</option>
-                    ))}
-                  </select>
+              {firstPeriod ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700">
+                  Berlaku untuk periode pertama: <span className="font-semibold">{getMonthName(firstPeriod.month)} {firstPeriod.year}</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">Tahun</label>
-                  <select value={saldoYear} onChange={(e) => setSaldoYear(Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base">
-                    {generateYears().map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-700">
+                  Belum ada periode. Saldo awal akan diterapkan ke bulan ini saat disimpan.
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Bulan Lalu (Rp)</label>
-                <NumericInput value={saldoAmount} onChange={setSaldoAmount} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
-              </div>
-              <button onClick={setSaldoAwal} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm flex items-center gap-2">
-                <Save className="w-4 h-4" />
-                Set Saldo Awal
-              </button>
+              )}
+
+              {/* Mode: sudah tersimpan, belum diedit */}
+              {firstPeriod && !saldoEditing ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Bulan Lalu (Rp)</label>
+                    <div className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-base bg-gray-50 text-gray-700 font-medium">
+                      {formatRupiah(firstPeriod.saldoPindahan)}
+                    </div>
+                  </div>
+                  <button onClick={confirmEditSaldo} className="border border-blue-500 text-blue-600 px-5 py-2.5 rounded-lg hover:bg-blue-50 text-base flex items-center gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Ubah Saldo Awal
+                  </button>
+                </div>
+              ) : (
+                /* Mode: belum ada periode atau sedang edit */
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Bulan Lalu (Rp)</label>
+                    <NumericInput value={saldoAmount} onChange={setSaldoAmount} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={setSaldoAwal} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm flex items-center gap-2">
+                      <Save className="w-4 h-4" />
+                      Simpan Saldo Awal
+                    </button>
+                    {saldoEditing && (
+                      <button onClick={() => { setSaldoEditing(false); setSaldoAmount(String(firstPeriod?.saldoPindahan || "")); }} className="border border-gray-300 text-gray-600 px-5 py-2.5 rounded-lg hover:bg-gray-50 text-base">
+                        Batal
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Backup / Restore */}
           {activeTab === "backup" && (
-            <div className="p-4 space-y-6">
-              {/* Download Backup */}
-              <div className="max-w-lg space-y-3">
-                <h3 className="text-lg font-semibold text-gray-800">Download Backup</h3>
-                <p className="text-sm text-gray-500">
-                  Download salinan database saat ini. Simpan file ini di tempat aman (flashdisk, Google Drive, dll).
+            <div className="space-y-6 max-w-lg">
+
+              {/* Section 1: Download Backup */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-800">Download Backup (.sql)</h3>
+                <p className="text-sm text-gray-600">
+                  Unduh seluruh data database sebagai file <code className="bg-gray-100 px-1 rounded">.sql</code> menggunakan <code className="bg-gray-100 px-1 rounded">pg_dump</code>.
                 </p>
                 <button
-                  onClick={() => {
-                    window.location.href = "/api/backup";
-                    showSuccess("File backup sedang diunduh");
+                  disabled={backupLoading}
+                  onClick={async () => {
+                    setBackupLoading(true);
+                    try {
+                      const res = await fetch("/api/backup");
+                      if (!res.ok) {
+                        const data = await res.json();
+                        showError(data.error || "Gagal membuat backup.");
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const today = new Date().toISOString().slice(0, 10);
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `backup-${today}.sql`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      showError("Gagal mengunduh backup.");
+                    } finally {
+                      setBackupLoading(false);
+                    }
                   }}
-                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm flex items-center gap-2"
+                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Download Backup
+                  {backupLoading ? "Mengunduh..." : "Download Backup"}
                 </button>
               </div>
 
               <hr />
 
-              {/* Restore */}
-              <div className="max-w-lg space-y-3">
-                <h3 className="text-lg font-semibold text-gray-800">Restore dari Backup</h3>
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
-                  <strong>Peringatan:</strong> Restore akan mengganti <em>seluruh</em> data saat ini dengan data dari file backup. Database saat ini akan di-backup otomatis sebelum di-replace.
+              {/* Section 2: Restore dari .sql */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-800">Restore dari File .sql</h3>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">
+                  <strong>Peringatan:</strong> Restore akan menimpa data yang ada sesuai isi file backup. Setelah selesai, Anda akan diarahkan ke halaman login.
                 </div>
-                <div>
+                <div className="flex gap-2 items-center flex-wrap">
                   <input
                     type="file"
-                    accept=".db"
-                    id="restore-file"
+                    accept=".sql"
+                    id="restore-file-input"
                     className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
+                    onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
+                  />
+                  <label
+                    htmlFor="restore-file-input"
+                    className="border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 text-base cursor-pointer flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {restoreFile ? restoreFile.name : "Pilih file .sql"}
+                  </label>
+                  <button
+                    disabled={!restoreFile || restoreLoading}
+                    onClick={async () => {
+                      if (!restoreFile) return;
                       const confirm = await showConfirmAction(
                         "Restore Database?",
-                        `File: ${file.name} (${(file.size / 1024).toFixed(0)} KB). Semua data saat ini akan diganti.`
+                        `File "${restoreFile.name}" akan dijalankan ke database. Data yang ada akan ditimpa.`
                       );
-                      if (!confirm.isConfirmed) {
-                        e.target.value = "";
-                        return;
-                      }
+                      if (!confirm.isConfirmed) return;
 
-                      const formData = new FormData();
-                      formData.append("file", file);
-
+                      setRestoreLoading(true);
                       try {
-                        const res = await fetch("/api/restore", {
-                          method: "POST",
-                          body: formData,
-                        });
+                        const fd = new FormData();
+                        fd.append("file", restoreFile);
+                        const res = await fetch("/api/restore", { method: "POST", body: fd });
                         const data = await res.json();
                         if (data.error) {
                           showError(data.error);
                         } else {
-                          showSuccess("Database berhasil dipulihkan! Halaman akan dimuat ulang.");
+                          showSuccess("Restore berhasil! Halaman akan dimuat ulang.");
+                          setTimeout(() => window.location.href = "/login", 1500);
+                        }
+                      } catch {
+                        showError("Gagal melakukan restore.");
+                      } finally {
+                        setRestoreLoading(false);
+                      }
+                    }}
+                    className="bg-orange-600 text-white px-5 py-2.5 rounded-lg hover:bg-orange-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    {restoreLoading ? "Memproses..." : "Restore"}
+                  </button>
+                </div>
+              </div>
+
+              <hr />
+
+              {/* Section 3: Import dari SQLite */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-800">Import dari SQLite (.db)</h3>
+                <p className="text-sm text-gray-600">
+                  Upload file database SQLite lama (<code className="bg-gray-100 px-1 rounded">.db</code>) untuk mengimport data ke PostgreSQL. Data yang ada di PostgreSQL akan dihapus terlebih dahulu.
+                </p>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <input
+                    type="file"
+                    accept=".db"
+                    id="sqlite-file-input"
+                    className="hidden"
+                    onChange={(e) => setSqliteFile(e.target.files?.[0] ?? null)}
+                  />
+                  <label
+                    htmlFor="sqlite-file-input"
+                    className="border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 text-base cursor-pointer flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {sqliteFile ? sqliteFile.name : "Pilih file .db"}
+                  </label>
+                  <button
+                    disabled={!sqliteFile || sqliteLoading}
+                    onClick={async () => {
+                      if (!sqliteFile) return;
+                      const confirm = await showConfirmAction(
+                        "Import dari SQLite?",
+                        `File "${sqliteFile.name}" akan diimport. Semua data PostgreSQL saat ini akan dihapus dan diganti dengan data dari file SQLite.`
+                      );
+                      if (!confirm.isConfirmed) return;
+
+                      setSqliteLoading(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", sqliteFile);
+                        const res = await fetch("/api/import-sqlite", { method: "POST", body: fd });
+                        const data = await res.json();
+                        if (data.error) {
+                          showError(data.error);
+                        } else {
+                          const { counts } = data as { counts: { users: number; periods: number; incomeEntries: number; expenseEntries: number } };
+                          showSuccess(
+                            `Import berhasil!\n` +
+                            `• ${counts.users} pengguna\n` +
+                            `• ${counts.periods} periode\n` +
+                            `• ${counts.incomeEntries} pemasukan\n` +
+                            `• ${counts.expenseEntries} pengeluaran`
+                          );
+                          setSqliteFile(null);
                           setTimeout(() => window.location.reload(), 1500);
                         }
                       } catch {
-                        showError("Gagal memulihkan database.");
+                        showError("Gagal mengimport database SQLite.");
+                      } finally {
+                        setSqliteLoading(false);
                       }
-                      e.target.value = "";
                     }}
-                  />
-                  <button
-                    onClick={() => document.getElementById("restore-file")?.click()}
-                    className="bg-orange-600 text-white px-5 py-2.5 rounded-lg hover:bg-orange-700 text-base shadow-sm flex items-center gap-2"
+                    className="bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
                   >
                     <Upload className="w-4 h-4" />
-                    Pilih File Backup (.db)
+                    {sqliteLoading ? "Mengimport..." : "Import"}
                   </button>
                 </div>
               </div>
@@ -635,7 +1008,7 @@ export default function PengaturanPage() {
               <hr />
 
               {/* Reset Database */}
-              <div className="max-w-lg space-y-3">
+              <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-red-700">Reset Database</h3>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                   <strong>Peringatan:</strong> Reset akan <em>menghapus semua data</em> (pemasukan, pengeluaran, periode, pengguna) dan mengembalikan ke data awal. Login kembali dengan <strong>admin / admin123</strong>.

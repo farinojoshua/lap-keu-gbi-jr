@@ -1,7 +1,7 @@
 "use client";
 
 import { Document, Page, Text, View, StyleSheet, Font, Image } from "@react-pdf/renderer";
-import { formatNumber, getMonthName, INCOME_CATEGORIES, EXPENSE_CATEGORIES, FUND_TYPES } from "@/lib/utils";
+import { formatNumber, getMonthName, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "@/lib/utils";
 
 /** Convert yyyy-mm-dd → "8 Feb 2026" */
 function formatDateID(dateStr: string) {
@@ -104,7 +104,7 @@ interface ReportData {
 }
 
 export default function ReportPDF({ data, logoUrl }: { data: ReportData; logoUrl?: string }) {
-  const { period, incomeByCategory, expenseByCategory, totalIncome, totalExpense, saldo, churchInfo, fundBalances } = data;
+  const { period, incomeByCategory, expenseByCategory, totalIncome, totalExpense, saldo, churchInfo } = data;
   const monthName = getMonthName(period.month);
   const daysInMonth = new Date(period.year, period.month, 0).getDate();
 
@@ -211,23 +211,17 @@ export default function ReportPDF({ data, logoUrl }: { data: ReportData; logoUrl
         <View style={styles.infoSection}>
           <Text style={styles.infoTitle}>KETERANGAN:</Text>
           <View style={styles.infoRow}>
-            <Text>Kas Tersedia</Text>
+            <Text style={styles.bold}>Kas Tersedia</Text>
             <Text style={styles.bold}>Rp {formatNumber(saldo)}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text>Saldo Rekening</Text>
-            <Text>Rp {formatNumber(period.saldoRekening)}</Text>
+          <View style={[styles.infoRow, { paddingLeft: 12 }]}>
+            <Text style={{ color: colors.gray600 }}>- Saldo Rekening</Text>
+            <Text style={{ color: colors.gray600 }}>Rp {formatNumber(period.saldoRekening)}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text>Saldo Cash</Text>
-            <Text>Rp {formatNumber(period.saldoCash)}</Text>
+          <View style={[styles.infoRow, { paddingLeft: 12 }]}>
+            <Text style={{ color: colors.gray600 }}>- Saldo Cash</Text>
+            <Text style={{ color: colors.gray600 }}>Rp {formatNumber(period.saldoCash)}</Text>
           </View>
-          {Object.entries(FUND_TYPES).map(([key, label]) => (
-            <View key={key} style={styles.infoRow}>
-              <Text>{label}</Text>
-              <Text>Rp {formatNumber(fundBalances[key] || 0)}</Text>
-            </View>
-          ))}
         </View>
 
         {/* TANDA TANGAN */}

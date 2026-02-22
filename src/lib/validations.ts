@@ -1,14 +1,11 @@
 import { z } from "zod";
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "./utils";
 
 // ---------- Income ----------
-
-const incomeCategories = Object.keys(INCOME_CATEGORIES);
 
 export const incomeEntrySchema = z.object({
   periodId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
-  category: z.string().refine((v) => incomeCategories.includes(v), "Kategori tidak valid"),
+  category: z.string().min(1, "Kategori wajib diisi"),
   subcategory: z.string().default(""),
   description: z.string().default(""),
   amount: z.number().int().min(0, "Jumlah tidak boleh negatif"),
@@ -18,7 +15,7 @@ export const incomeEntrySchema = z.object({
 export const incomeUpdateSchema = z.object({
   id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  category: z.string().refine((v) => incomeCategories.includes(v)).optional(),
+  category: z.string().min(1).optional(),
   subcategory: z.string().optional(),
   description: z.string().optional(),
   amount: z.number().int().min(0).optional(),
@@ -27,12 +24,10 @@ export const incomeUpdateSchema = z.object({
 
 // ---------- Expense ----------
 
-const expenseCategories = Object.keys(EXPENSE_CATEGORIES);
-
 export const expenseEntrySchema = z.object({
   periodId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
-  category: z.string().refine((v) => expenseCategories.includes(v), "Kategori tidak valid"),
+  category: z.string().min(1, "Kategori wajib diisi"),
   description: z.string().default(""),
   amount: z.number().int().min(0, "Jumlah tidak boleh negatif"),
   isFixed: z.boolean().default(false),
@@ -41,7 +36,7 @@ export const expenseEntrySchema = z.object({
 export const expenseUpdateSchema = z.object({
   id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  category: z.string().refine((v) => expenseCategories.includes(v)).optional(),
+  category: z.string().min(1).optional(),
   description: z.string().optional(),
   amount: z.number().int().min(0).optional(),
   isFixed: z.boolean().optional(),
@@ -59,7 +54,7 @@ export const periodUpdateSchema = z.object({
 // ---------- Expense Template ----------
 
 export const expenseTemplateCreateSchema = z.object({
-  category: z.string().refine((v) => expenseCategories.includes(v), "Kategori tidak valid"),
+  category: z.string().min(1, "Kategori wajib diisi"),
   description: z.string().min(1, "Keterangan wajib diisi"),
   defaultAmount: z.number().int().min(0, "Jumlah tidak boleh negatif"),
   isActive: z.boolean().default(true),
@@ -67,7 +62,7 @@ export const expenseTemplateCreateSchema = z.object({
 
 export const expenseTemplateUpdateSchema = z.object({
   id: z.string().min(1),
-  category: z.string().refine((v) => expenseCategories.includes(v)).optional(),
+  category: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
   defaultAmount: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),

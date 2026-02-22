@@ -23,6 +23,7 @@ declare module "next-auth/jwt" {
 export interface WeeklyEntry {
   date: string;
   attendance: number;
+  smAttendance: number;
   persembahan: number;
 }
 

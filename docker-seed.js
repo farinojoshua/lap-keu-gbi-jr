@@ -100,6 +100,51 @@ async function seed() {
     }
   }
 
+  // Seed expense categories
+  const expenseCats = [
+    { type: "expense", key: "pk_tim", label: "PK Tim Pelayanan" },
+    { type: "expense", key: "pk_kebersihan", label: "PK Kebersihan" },
+    { type: "expense", key: "pk_penjemputan", label: "PK Penjemputan" },
+    { type: "expense", key: "pk_pelayan_ft", label: "PK Pelayan FT" },
+    { type: "expense", key: "konsumsi", label: "Konsumsi" },
+    { type: "expense", key: "listrik", label: "Listrik" },
+    { type: "expense", key: "atk_perlengkapan", label: "ATK & Perlengkapan" },
+    { type: "expense", key: "kendaraan", label: "Kendaraan" },
+    { type: "expense", key: "sound_musik", label: "Sound & Musik" },
+    { type: "expense", key: "perbaikan_gedung", label: "Perbaikan Gedung" },
+    { type: "expense", key: "sewa", label: "Alokasi Dana Sewa" },
+    { type: "expense", key: "pembangunan", label: "Alokasi Dana Pembangunan" },
+    { type: "expense", key: "komsel", label: "Alokasi Dana Komsel" },
+    { type: "expense", key: "diakonia", label: "Dana Diakonia" },
+    { type: "expense", key: "perjamuan", label: "Perjamuan" },
+    { type: "expense", key: "baptis", label: "Baptis" },
+    { type: "expense", key: "dll", label: "Lain-lain" },
+  ];
+  for (const cat of expenseCats) {
+    await prisma.category.upsert({
+      where: { type_key: { type: cat.type, key: cat.key } },
+      update: {},
+      create: cat,
+    });
+  }
+  console.log("Expense categories seeded");
+
+  // Seed income_other categories
+  const incomeCats = [
+    { type: "income_other", key: "pembangunan", label: "Pembangunan" },
+    { type: "income_other", key: "diakonia", label: "Diakonia" },
+    { type: "income_other", key: "donasi", label: "Donasi" },
+    { type: "income_other", key: "dll", label: "Lain-lain" },
+  ];
+  for (const cat of incomeCats) {
+    await prisma.category.upsert({
+      where: { type_key: { type: cat.type, key: cat.key } },
+      update: {},
+      create: cat,
+    });
+  }
+  console.log("Income other categories seeded");
+
   console.log("Seed completed successfully!");
   await prisma.$disconnect();
 }

@@ -2,6 +2,12 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatRupiah, getMonthName, INCOME_CATEGORIES, formatDateID, generateYears } from "@/lib/utils";
+
+interface CategoryItem {
+  id: string;
+  key: string;
+  label: string;
+}
 import { showSuccess, showConfirmDelete, showError } from "@/lib/swal";
 import { showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
@@ -35,6 +41,7 @@ export default function PemasukanPage() {
   const [periodId, setPeriodId] = useState("");
   const [entries, setEntries] = useState<IncomeEntry[]>([]);
   const [komselGroups, setKomselGroups] = useState<KomselGroup[]>([]);
+  const [otherCats, setOtherCats] = useState<CategoryItem[]>([]);
   const [activeForm, setActiveForm] = useState<FormType>("ibadah");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,7 +73,7 @@ export default function PemasukanPage() {
   const [syukurAmount, setSyukurAmount] = useState("");
 
   const [lainDate, setLainDate] = useState("");
-  const [lainCategory, setLainCategory] = useState("pembangunan");
+  const [lainCategory, setLainCategory] = useState("");
   const [lainDesc, setLainDesc] = useState("");
   const [lainAmount, setLainAmount] = useState("");
 
@@ -99,6 +106,14 @@ export default function PemasukanPage() {
     fetch("/api/settings/komsel")
       .then((r) => r.json())
       .then(setKomselGroups);
+    fetch("/api/settings/categories?type=income_other")
+      .then((r) => r.json())
+      .then((data: CategoryItem[]) => {
+        if (Array.isArray(data)) {
+          setOtherCats(data);
+          setLainCategory((prev) => prev || data[0]?.key || "");
+        }
+      });
   }, [loadData]);
 
   async function handleIbadahSubmit(e: React.FormEvent) {
@@ -247,7 +262,7 @@ export default function PemasukanPage() {
         (e) =>
           e.description.toLowerCase().includes(q) ||
           e.category.toLowerCase().includes(q) ||
-          (INCOME_CATEGORIES[e.category] || "").toLowerCase().includes(q) ||
+          (otherCats.find((c) => c.key === e.category)?.label || INCOME_CATEGORIES[e.category] || "").toLowerCase().includes(q) ||
           e.date.includes(q) ||
           formatDateID(e.date).toLowerCase().includes(q)
       );
@@ -586,8 +601,8 @@ export default function PemasukanPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">Kategori</label>
                     <select required value={lainCategory} onChange={(e) => setLainCategory(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base">
-                      {["pembangunan", "diakonia", "donasi", "dll"].map((c) => (
-                        <option key={c} value={c}>{INCOME_CATEGORIES[c]}</option>
+                      {otherCats.map((c) => (
+                        <option key={c.key} value={c.key}>{c.label}</option>
                       ))}
                     </select>
                   </div>
@@ -663,7 +678,7 @@ export default function PemasukanPage() {
                         <td className="px-4 py-2">
                           <input type="date" min={dateMin} max={dateMax} value={editDate} onChange={(e) => setEditDate(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full" />
                         </td>
-                        <td className="px-4 py-2 text-gray-600">{INCOME_CATEGORIES[entry.category] || entry.category}</td>
+                        <td className="px-4 py-2 text-gray-600">{otherCats.find((c) => c.key === entry.category)?.label || INCOME_CATEGORIES[entry.category] || entry.category}</td>
                         <td className="px-4 py-2">
                           <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1.5 text-base w-full" />
                         </td>
@@ -687,7 +702,7 @@ export default function PemasukanPage() {
                     ) : (
                       <>
                         <td className="px-4 py-2 text-gray-800">{formatDateID(entry.date)}</td>
-                        <td className="px-4 py-2 text-gray-600">{INCOME_CATEGORIES[entry.category] || entry.category}</td>
+                        <td className="px-4 py-2 text-gray-600">{otherCats.find((c) => c.key === entry.category)?.label || INCOME_CATEGORIES[entry.category] || entry.category}</td>
                         <td className="px-4 py-2 text-gray-600">{entry.description}</td>
                         <td className="px-4 py-2 text-gray-600">{entry.attendance || "-"}</td>
                         <td className="px-4 py-2 text-right font-medium text-gray-800">{formatRupiah(entry.amount)}</td>
