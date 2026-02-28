@@ -15,7 +15,6 @@ import { showSuccess, showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
 import { Skeleton, SkeletonTable } from "@/components/ui/Skeleton";
 import { Lock } from "lucide-react";
-import ComparisonReport from "@/components/report/ComparisonReport";
 
 const PDFExportButton = dynamic(() => import("@/components/report/PDFExportButton"), {
   ssr: false,
@@ -66,7 +65,6 @@ export default function LaporanPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"monthly" | "comparison">("monthly");
 
   // Saldo edit
   const [editSaldo, setEditSaldo] = useState(false);
@@ -191,62 +189,34 @@ export default function LaporanPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => setActiveTab("monthly")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "monthly"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Laporan Bulanan
-          </button>
-          <button
-            onClick={() => setActiveTab("comparison")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "comparison"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Perbandingan
-          </button>
+        <div className="flex gap-2 items-center flex-wrap">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border border-gray-300 rounded-lg px-4 py-2.5 text-base">
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
+            ))}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-4 py-2.5 text-base">
+            {generateYears().map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+
+          <PDFExportButton data={data} month={month} year={year} />
+
+          {!data?.period.isLocked && (
+            <button
+              onClick={handleClosePeriod}
+              disabled={closing}
+              className="bg-orange-600 text-white px-5 py-2.5 rounded-lg hover:bg-orange-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              {closing ? "Menutup..." : "Tutup Periode"}
+            </button>
+          )}
         </div>
-
-        {activeTab === "monthly" && (
-          <div className="flex gap-2 items-center flex-wrap">
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border border-gray-300 rounded-lg px-4 py-2.5 text-base">
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
-              ))}
-            </select>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-4 py-2.5 text-base">
-              {generateYears().map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-
-            <PDFExportButton data={data} month={month} year={year} />
-
-            {!data?.period.isLocked && (
-              <button
-                onClick={handleClosePeriod}
-                disabled={closing}
-                className="bg-orange-600 text-white px-5 py-2.5 rounded-lg hover:bg-orange-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
-              >
-                <Lock className="w-4 h-4" />
-                {closing ? "Menutup..." : "Tutup Periode"}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {activeTab === "comparison" ? (
-        <ComparisonReport />
-      ) : (
-        <>
+      <>
           {data.period.isLocked && (
             <div className="bg-green-50 text-green-700 p-3 rounded-lg border border-green-200 text-base flex items-center gap-2">
               <Lock className="w-4 h-4 shrink-0" />
@@ -451,7 +421,6 @@ export default function LaporanPage() {
           </div>
         </div>
       </>
-      )}
     </div>
   );
 }

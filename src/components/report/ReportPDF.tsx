@@ -1,7 +1,7 @@
 "use client";
 
 import { Document, Page, Text, View, StyleSheet, Font, Image } from "@react-pdf/renderer";
-import { formatNumber, getMonthName, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "@/lib/utils";
+import { formatNumber, getMonthName, INCOME_CATEGORIES, EXPENSE_CATEGORIES, FUND_TYPES } from "@/lib/utils";
 
 /** Convert yyyy-mm-dd → "8 Feb 2026" */
 function formatDateID(dateStr: string) {
@@ -104,7 +104,7 @@ interface ReportData {
 }
 
 export default function ReportPDF({ data, logoUrl }: { data: ReportData; logoUrl?: string }) {
-  const { period, incomeByCategory, expenseByCategory, totalIncome, totalExpense, saldo, churchInfo } = data;
+  const { period, incomeByCategory, expenseByCategory, totalIncome, totalExpense, saldo, churchInfo, fundBalances } = data;
   const monthName = getMonthName(period.month);
   const daysInMonth = new Date(period.year, period.month, 0).getDate();
 
@@ -222,6 +222,19 @@ export default function ReportPDF({ data, logoUrl }: { data: ReportData; logoUrl
             <Text style={{ color: colors.gray600 }}>- Saldo Cash</Text>
             <Text style={{ color: colors.gray600 }}>Rp {formatNumber(period.saldoCash)}</Text>
           </View>
+          {Object.entries(fundBalances).filter(([, val]) => val > 0).length > 0 && (
+            <>
+              <View style={[styles.infoRow, { marginTop: 4 }]}>
+                <Text style={styles.bold}>Dana Tersimpan</Text>
+              </View>
+              {Object.entries(fundBalances).filter(([, val]) => val > 0).map(([key, val]) => (
+                <View key={key} style={[styles.infoRow, { paddingLeft: 12 }]}>
+                  <Text style={{ color: colors.gray600 }}>- {FUND_TYPES[key] || key}</Text>
+                  <Text style={{ color: colors.gray600 }}>Rp {formatNumber(val)}</Text>
+                </View>
+              ))}
+            </>
+          )}
         </View>
 
         {/* TANDA TANGAN */}
