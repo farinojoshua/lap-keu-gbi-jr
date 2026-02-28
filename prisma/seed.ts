@@ -65,6 +65,47 @@ async function main() {
     });
   }
 
+  // Create default expense categories
+  const expenseCategories = [
+    { key: "pk_tim", label: "PK Tim Pelayanan" },
+    { key: "pk_kebersihan", label: "PK Kebersihan" },
+    { key: "pk_penjemputan", label: "PK Penjemputan" },
+    { key: "pk_pelayan_ft", label: "PK Pelayan FT" },
+    { key: "konsumsi", label: "Konsumsi" },
+    { key: "listrik", label: "Listrik" },
+    { key: "atk_perlengkapan", label: "ATK & Perlengkapan" },
+    { key: "kendaraan", label: "Kendaraan" },
+    { key: "sound_musik", label: "Sound & Musik" },
+    { key: "perbaikan_gedung", label: "Perbaikan Gedung" },
+    { key: "sewa", label: "Alokasi Dana Sewa" },
+    { key: "pembangunan", label: "Alokasi Dana Pembangunan" },
+    { key: "komsel", label: "Alokasi Dana Komsel" },
+    { key: "diakonia", label: "Dana Diakonia" },
+    { key: "perjamuan", label: "Perjamuan" },
+    { key: "baptis", label: "Baptis" },
+    { key: "dll", label: "Lain-lain" },
+  ];
+  for (const cat of expenseCategories) {
+    await prisma.category.upsert({
+      where: { type_key: { type: "expense", key: cat.key } },
+      update: { label: cat.label },
+      create: { type: "expense", key: cat.key, label: cat.label },
+    });
+  }
+
+  // Create default income_other categories
+  const incomeOtherCategories = [
+    { key: "donasi", label: "Donasi" },
+    { key: "dll", label: "Lain-lain" },
+  ];
+  for (const cat of incomeOtherCategories) {
+    await prisma.category.upsert({
+      where: { type_key: { type: "income_other", key: cat.key } },
+      update: { label: cat.label },
+      create: { type: "income_other", key: cat.key, label: cat.label },
+    });
+  }
+
   console.log("Seed data created successfully!");
 }
 
