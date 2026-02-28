@@ -6,7 +6,7 @@ import { formatRupiah, getMonthName } from "@/lib/utils";
 import { showSuccess, showError, showConfirmDelete, showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Database, RotateCcw, Download, Upload, Tag, Check, X } from "lucide-react";
+import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Tag, Check, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Template {
@@ -30,7 +30,7 @@ interface User {
   role: string;
 }
 
-type Tab = "church" | "templates" | "komsel" | "users" | "saldo" | "backup" | "kategori";
+type Tab = "church" | "templates" | "komsel" | "users" | "saldo" | "kategori";
 
 interface CategoryItem {
   id: string;
@@ -74,12 +74,6 @@ export default function PengaturanPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  // Backup / Restore / Import
-  const [backupLoading, setBackupLoading] = useState(false);
-  const [restoreFile, setRestoreFile] = useState<File | null>(null);
-  const [restoreLoading, setRestoreLoading] = useState(false);
-  const [sqliteFile, setSqliteFile] = useState<File | null>(null);
-  const [sqliteLoading, setSqliteLoading] = useState(false);
 
   // Categories
   const [expenseCats, setExpenseCats] = useState<CategoryItem[]>([]);
@@ -380,7 +374,6 @@ export default function PengaturanPage() {
     { key: "kategori", label: "Kategori", icon: Tag, adminOnly: true },
     { key: "users", label: "Pengguna", icon: UserCog, adminOnly: true },
     { key: "saldo", label: "Saldo Awal", icon: Banknote },
-    { key: "backup", label: "Backup", icon: Database, adminOnly: true },
   ];
 
   const tabs = allTabs.filter((t) => !t.adminOnly || isAdmin);
@@ -837,217 +830,6 @@ export default function PengaturanPage() {
             </div>
           )}
 
-          {/* Backup / Restore */}
-          {activeTab === "backup" && (
-            <div className="space-y-6 max-w-lg">
-
-              {/* Section 1: Download Backup */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-800">Download Backup (.sql)</h3>
-                <p className="text-sm text-gray-600">
-                  Unduh seluruh data database sebagai file <code className="bg-gray-100 px-1 rounded">.sql</code> menggunakan <code className="bg-gray-100 px-1 rounded">pg_dump</code>.
-                </p>
-                <button
-                  disabled={backupLoading}
-                  onClick={async () => {
-                    setBackupLoading(true);
-                    try {
-                      const res = await fetch("/api/backup");
-                      if (!res.ok) {
-                        const data = await res.json();
-                        showError(data.error || "Gagal membuat backup.");
-                        return;
-                      }
-                      const blob = await res.blob();
-                      const today = new Date().toISOString().slice(0, 10);
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `backup-${today}.sql`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    } catch {
-                      showError("Gagal mengunduh backup.");
-                    } finally {
-                      setBackupLoading(false);
-                    }
-                  }}
-                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  {backupLoading ? "Mengunduh..." : "Download Backup"}
-                </button>
-              </div>
-
-              <hr />
-
-              {/* Section 2: Restore dari .sql */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-800">Restore dari File .sql</h3>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">
-                  <strong>Peringatan:</strong> Restore akan menimpa data yang ada sesuai isi file backup. Setelah selesai, Anda akan diarahkan ke halaman login.
-                </div>
-                <div className="flex gap-2 items-center flex-wrap">
-                  <input
-                    type="file"
-                    accept=".sql"
-                    id="restore-file-input"
-                    className="hidden"
-                    onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
-                  />
-                  <label
-                    htmlFor="restore-file-input"
-                    className="border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 text-base cursor-pointer flex items-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {restoreFile ? restoreFile.name : "Pilih file .sql"}
-                  </label>
-                  <button
-                    disabled={!restoreFile || restoreLoading}
-                    onClick={async () => {
-                      if (!restoreFile) return;
-                      const confirm = await showConfirmAction(
-                        "Restore Database?",
-                        `File "${restoreFile.name}" akan dijalankan ke database. Data yang ada akan ditimpa.`
-                      );
-                      if (!confirm.isConfirmed) return;
-
-                      setRestoreLoading(true);
-                      try {
-                        const fd = new FormData();
-                        fd.append("file", restoreFile);
-                        const res = await fetch("/api/restore", { method: "POST", body: fd });
-                        const data = await res.json();
-                        if (data.error) {
-                          showError(data.error);
-                        } else {
-                          showSuccess("Restore berhasil! Halaman akan dimuat ulang.");
-                          setTimeout(() => window.location.href = "/login", 1500);
-                        }
-                      } catch {
-                        showError("Gagal melakukan restore.");
-                      } finally {
-                        setRestoreLoading(false);
-                      }
-                    }}
-                    className="bg-orange-600 text-white px-5 py-2.5 rounded-lg hover:bg-orange-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    {restoreLoading ? "Memproses..." : "Restore"}
-                  </button>
-                </div>
-              </div>
-
-              <hr />
-
-              {/* Section 3: Import dari SQLite */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-800">Import dari SQLite (.db)</h3>
-                <p className="text-sm text-gray-600">
-                  Upload file database SQLite lama (<code className="bg-gray-100 px-1 rounded">.db</code>) untuk mengimport data ke PostgreSQL. Data yang ada di PostgreSQL akan dihapus terlebih dahulu.
-                </p>
-                <div className="flex gap-2 items-center flex-wrap">
-                  <input
-                    type="file"
-                    accept=".db"
-                    id="sqlite-file-input"
-                    className="hidden"
-                    onChange={(e) => setSqliteFile(e.target.files?.[0] ?? null)}
-                  />
-                  <label
-                    htmlFor="sqlite-file-input"
-                    className="border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 text-base cursor-pointer flex items-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {sqliteFile ? sqliteFile.name : "Pilih file .db"}
-                  </label>
-                  <button
-                    disabled={!sqliteFile || sqliteLoading}
-                    onClick={async () => {
-                      if (!sqliteFile) return;
-                      const confirm = await showConfirmAction(
-                        "Import dari SQLite?",
-                        `File "${sqliteFile.name}" akan diimport. Semua data PostgreSQL saat ini akan dihapus dan diganti dengan data dari file SQLite.`
-                      );
-                      if (!confirm.isConfirmed) return;
-
-                      setSqliteLoading(true);
-                      try {
-                        const fd = new FormData();
-                        fd.append("file", sqliteFile);
-                        const res = await fetch("/api/import-sqlite", { method: "POST", body: fd });
-                        const data = await res.json();
-                        if (data.error) {
-                          showError(data.error);
-                        } else {
-                          const { counts } = data as { counts: { users: number; periods: number; incomeEntries: number; expenseEntries: number } };
-                          showSuccess(
-                            `Import berhasil!\n` +
-                            `• ${counts.users} pengguna\n` +
-                            `• ${counts.periods} periode\n` +
-                            `• ${counts.incomeEntries} pemasukan\n` +
-                            `• ${counts.expenseEntries} pengeluaran`
-                          );
-                          setSqliteFile(null);
-                          setTimeout(() => window.location.reload(), 1500);
-                        }
-                      } catch {
-                        showError("Gagal mengimport database SQLite.");
-                      } finally {
-                        setSqliteLoading(false);
-                      }
-                    }}
-                    className="bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700 disabled:opacity-50 text-base shadow-sm flex items-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {sqliteLoading ? "Mengimport..." : "Import"}
-                  </button>
-                </div>
-              </div>
-
-              <hr />
-
-              {/* Reset Database */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-red-700">Reset Database</h3>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                  <strong>Peringatan:</strong> Reset akan <em>menghapus semua data</em> (pemasukan, pengeluaran, periode, pengguna) dan mengembalikan ke data awal. Login kembali dengan <strong>admin / admin123</strong>.
-                </div>
-                <button
-                  onClick={async () => {
-                    const confirm = await showConfirmAction(
-                      "Reset Database?",
-                      "SEMUA data akan dihapus dan dikembalikan ke data awal. Aksi ini tidak bisa dibatalkan!"
-                    );
-                    if (!confirm.isConfirmed) return;
-
-                    const confirm2 = await showConfirmAction(
-                      "Yakin 100%?",
-                      "Ketik ulang: semua data akan hilang. Lanjutkan reset?"
-                    );
-                    if (!confirm2.isConfirmed) return;
-
-                    try {
-                      const res = await fetch("/api/reset", { method: "POST" });
-                      const result = await res.json();
-                      if (result.error) {
-                        showError(result.error);
-                      } else {
-                        showSuccess("Database berhasil di-reset! Halaman akan dimuat ulang.");
-                        setTimeout(() => window.location.href = "/login", 1500);
-                      }
-                    } catch {
-                      showError("Gagal mereset database.");
-                    }
-                  }}
-                  className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 text-base shadow-sm flex items-center gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reset ke Data Awal
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
