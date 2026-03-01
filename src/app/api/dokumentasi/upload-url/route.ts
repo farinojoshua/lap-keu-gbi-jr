@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { activityId, folderId, contentType } = uploadUrlRequestSchema.parse(body);
 
-    const ext = EXT_MAP[contentType];
+    const ext = EXT_MAP[contentType] ?? "bin";
     const r2Key = folderId
       ? `dokumentasi/${activityId}/${folderId}/${Date.now()}-${randomSuffix()}.${ext}`
       : `dokumentasi/${activityId}/${Date.now()}-${randomSuffix()}.${ext}`;

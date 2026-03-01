@@ -306,7 +306,9 @@ export default function PengaturanPage() {
     if (!periodId) {
       const now = new Date();
       const res = await fetch(`/api/periods?month=${now.getMonth() + 1}&year=${now.getFullYear()}`);
+      if (!res.ok) { showError("Gagal membuat periode awal"); return; }
       const newPeriod = await res.json();
+      if (!newPeriod.id) { showError("Gagal membuat periode awal"); return; }
       periodId = newPeriod.id;
       setFirstPeriod({ id: newPeriod.id, month: newPeriod.month, year: newPeriod.year, saldoPindahan: Number(saldoAmount) });
     }

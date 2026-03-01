@@ -133,7 +133,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAuth();
+  const auth = await requireDocOrAdmin();
   if (auth instanceof NextResponse) return auth;
 
   try {

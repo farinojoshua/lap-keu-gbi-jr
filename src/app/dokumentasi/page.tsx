@@ -160,7 +160,7 @@ export default function DokumentasiPage() {
       const data = await fetch("/api/dokumentasi/activities").then((r) => r.json());
       setActivities(Array.isArray(data) ? data : []);
     } catch {
-      // silently ignore
+      showError("Gagal memuat daftar kegiatan. Coba muat ulang halaman.");
     }
   }
 
@@ -514,7 +514,7 @@ export default function DokumentasiPage() {
     return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
   }
 
-  const lightboxMedia = lightboxIndex !== null ? media[lightboxIndex] : null;
+  const lightboxMedia = lightboxIndex !== null && lightboxIndex < media.length ? media[lightboxIndex] : null;
   const canSelectMode = deletableMedia.length > 0;
 
   // Selected activity name
