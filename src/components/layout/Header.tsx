@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { Menu, User, LogOut, Shield, BookOpen } from "lucide-react";
+import { Menu, User, LogOut, Shield, BookOpen, Camera } from "lucide-react";
 
 export default function Header({ onMenuToggle }: { onMenuToggle: () => void }) {
   const { data: session, status } = useSession();
@@ -29,10 +29,12 @@ export default function Header({ onMenuToggle }: { onMenuToggle: () => void }) {
                 {session.user.name}
               </span>
               <span className={`text-xs font-medium leading-tight flex items-center gap-1 ${
-                role === "admin" ? "text-purple-600" : "text-blue-600"
+                role === "admin" ? "text-purple-600" : role === "dokumentasi" ? "text-green-600" : "text-blue-600"
               }`}>
                 {role === "admin" ? (
                   <><Shield className="w-3 h-3" /> Admin</>
+                ) : role === "dokumentasi" ? (
+                  <><Camera className="w-3 h-3" /> Dokumentasi</>
                 ) : (
                   <><BookOpen className="w-3 h-3" /> Bendahara</>
                 )}

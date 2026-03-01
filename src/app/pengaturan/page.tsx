@@ -99,12 +99,15 @@ export default function PengaturanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // Set default tab based on role (bendahara tidak bisa akses church/komsel/users/kategori)
+  // Set default tab ke tab pertama yang boleh diakses role ini
   useEffect(() => {
-    if (!isAdmin && (activeTab === "church" || activeTab === "komsel" || activeTab === "users" || activeTab === "kategori")) {
-      setActiveTab("saldo");
+    if (status === "loading" || !role) return;
+    const allowed = allTabs.filter((t) => !t.roles || t.roles.includes(role));
+    if (allowed.length > 0 && !allowed.find((t) => t.key === activeTab)) {
+      setActiveTab(allowed[0].key);
     }
-  }, [isAdmin, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, status]);
 
   async function loadAll() {
     setLoading(true);
@@ -380,6 +383,18 @@ export default function PengaturanPage() {
   ];
 
   const tabs = allTabs.filter((t) => !t.roles || (role !== undefined && t.roles.includes(role)));
+
+  if (!loading && tabs.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-gray-800">Pengaturan</h1>
+        <div className="bg-white rounded-lg shadow-sm border p-12 flex flex-col items-center text-center text-gray-400">
+          <p className="text-base font-medium">Tidak ada pengaturan yang dapat diakses</p>
+          <p className="text-sm mt-1">Role Anda tidak memiliki akses ke menu pengaturan.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || status === "loading") {
     return (
