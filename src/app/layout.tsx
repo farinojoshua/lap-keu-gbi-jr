@@ -7,8 +7,8 @@ import AppLayout from "@/components/layout/AppLayout";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Laporan Keuangan - GBI Jonggol Raya",
-  description: "Sistem Laporan Keuangan GBI Jonggol Raya",
+  title: "GBI Jonggol Portal",
+  description: "Portal Gereja GBI Jonggol Raya",
 };
 
 export default function RootLayout({
