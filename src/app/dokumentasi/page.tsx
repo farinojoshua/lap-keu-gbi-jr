@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { showConfirmDelete, showConfirmAction, showError, showSuccess } from "@/lib/swal";
 import {
   Upload, Trash2, Download, X, ChevronLeft, ChevronRight, Images,
-  CheckSquare, Square, Play, Pencil, Check, FolderOpen, FolderPlus,
+  CheckSquare, Square, Play, Pencil, Check, FolderOpen, FolderPlus, Plus,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -87,6 +87,10 @@ export default function DokumentasiPage() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
+  // Activity management (tambah/hapus kegiatan)
+  const [newActivityName, setNewActivityName] = useState("");
+  const [addingActivity, setAddingActivity] = useState(false);
+
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [filterDate, setFilterDate] = useState("");
   const [loading, setLoading] = useState(true);
@@ -157,6 +161,39 @@ export default function DokumentasiPage() {
       setActivities(Array.isArray(data) ? data : []);
     } catch {
       // silently ignore
+    }
+  }
+
+  async function handleAddActivity() {
+    const name = newActivityName.trim();
+    if (!name) return;
+    const res = await fetch("/api/dokumentasi/activities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      const activity = await res.json();
+      setActivities((prev) => [...prev, activity].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewActivityName("");
+      setAddingActivity(false);
+    } else {
+      const d = await res.json();
+      showError(d.error || "Gagal menambah kegiatan");
+    }
+  }
+
+  async function handleDeleteActivity(id: string, name: string) {
+    const result = await showConfirmDelete(`Semua foto/video dan folder pada kegiatan "${name}" akan ikut dihapus.`);
+    if (!result.isConfirmed) return;
+    const res = await fetch(`/api/dokumentasi/activities?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setActivities((prev) => prev.filter((a) => a.id !== id));
+      if (selectedActivity === id) selectActivity(null);
+      showSuccess("Kegiatan berhasil dihapus");
+    } else {
+      const d = await res.json();
+      showError(d.error || "Gagal menghapus kegiatan");
     }
   }
 
@@ -605,32 +642,89 @@ export default function DokumentasiPage() {
 
       <div className="flex gap-4 flex-col lg:flex-row">
         {/* Activity filter panel */}
-        <aside className="lg:w-48 shrink-0">
-          <div className="bg-white rounded-lg shadow-sm border p-3 space-y-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">Kegiatan</p>
-            <button
-              onClick={() => selectActivity(null)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedActivity === null
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              Semua
-            </button>
-            {activities.map((a) => (
+        <aside className="lg:w-52 shrink-0">
+          <div className="bg-white rounded-lg shadow-sm border p-3">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Kegiatan</p>
+              {canManageFolders && (
+                <button
+                  onClick={() => setAddingActivity(true)}
+                  className="p-0.5 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="Tambah kegiatan"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="space-y-0.5">
               <button
-                key={a.id}
-                onClick={() => selectActivity(a.id)}
+                onClick={() => selectActivity(null)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedActivity === a.id
+                  selectedActivity === null
                     ? "bg-blue-50 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {a.name}
+                Semua
               </button>
-            ))}
+              {activities.map((a) => (
+                <div
+                  key={a.id}
+                  className={`group flex items-center rounded-lg transition-colors ${
+                    selectedActivity === a.id ? "bg-blue-50" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <button
+                    onClick={() => selectActivity(a.id)}
+                    className={`flex-1 text-left px-3 py-2 text-sm font-medium truncate ${
+                      selectedActivity === a.id ? "text-blue-700" : "text-gray-600"
+                    }`}
+                  >
+                    {a.name}
+                  </button>
+                  {canManageFolders && (
+                    <button
+                      onClick={() => handleDeleteActivity(a.id, a.name)}
+                      className="shrink-0 pr-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
+                      title="Hapus kegiatan"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Form tambah kegiatan */}
+            {canManageFolders && addingActivity && (
+              <div className="mt-2 pt-2 border-t space-y-1.5">
+                <input
+                  autoFocus
+                  value={newActivityName}
+                  onChange={(e) => setNewActivityName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddActivity();
+                    if (e.key === "Escape") { setAddingActivity(false); setNewActivityName(""); }
+                  }}
+                  placeholder="Nama kegiatan"
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={handleAddActivity}
+                    className="flex-1 px-2 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Tambah
+                  </button>
+                  <button
+                    onClick={() => { setAddingActivity(false); setNewActivityName(""); }}
+                    className="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </aside>
 

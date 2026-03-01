@@ -6,7 +6,7 @@ import { formatRupiah, getMonthName } from "@/lib/utils";
 import { showSuccess, showError, showConfirmDelete, showConfirmAction } from "@/lib/swal";
 import NumericInput from "@/components/ui/NumericInput";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Tag, Check, X, Images } from "lucide-react";
+import { Church, FileSpreadsheet, Users2, UserCog, Banknote, Save, Pencil, Trash2, Tag, Check, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Template {
@@ -23,12 +23,6 @@ interface KomselGroup {
   isActive: boolean;
 }
 
-interface Activity {
-  id: string;
-  name: string;
-  isActive: boolean;
-}
-
 interface User {
   id: string;
   username: string;
@@ -36,7 +30,7 @@ interface User {
   role: string;
 }
 
-type Tab = "church" | "templates" | "komsel" | "kegiatan" | "users" | "saldo" | "kategori";
+type Tab = "church" | "templates" | "komsel" | "users" | "saldo" | "kategori";
 
 interface CategoryItem {
   id: string;
@@ -47,7 +41,7 @@ interface CategoryItem {
 export default function PengaturanPage() {
   const { data: session, status } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
-  const [activeTab, setActiveTab] = useState<Tab>("church");
+  const [activeTab, setActiveTab] = useState<Tab>("saldo");
 
   // Church info
   const [churchName, setChurchName] = useState("");
@@ -69,9 +63,6 @@ export default function PengaturanPage() {
   const [komselGroups, setKomselGroups] = useState<KomselGroup[]>([]);
   const [newKomselName, setNewKomselName] = useState("");
 
-  // Kegiatan (Dokumentasi)
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [newActivityName, setNewActivityName] = useState("");
 
   // Users
   const [users, setUsers] = useState<User[]>([]);
@@ -101,7 +92,6 @@ export default function PengaturanPage() {
   const [saldoEditing, setSaldoEditing] = useState(false);
 
   const isAdmin = role === "admin";
-  const isDocOrAdmin = role === "admin" || role === "dokumentasi";
 
   useEffect(() => {
     if (status === "loading") return;
@@ -109,12 +99,12 @@ export default function PengaturanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // Set default tab based on role
+  // Set default tab based on role (bendahara tidak bisa akses church/komsel/users/kategori)
   useEffect(() => {
-    if (!isAdmin && activeTab === "church") {
-      setActiveTab(isDocOrAdmin ? "kegiatan" : "templates");
+    if (!isAdmin && (activeTab === "church" || activeTab === "komsel" || activeTab === "users" || activeTab === "kategori")) {
+      setActiveTab("saldo");
     }
-  }, [isAdmin, isDocOrAdmin, activeTab]);
+  }, [isAdmin, activeTab]);
 
   async function loadAll() {
     setLoading(true);
@@ -126,7 +116,6 @@ export default function PengaturanPage() {
         fetch("/api/periods").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
         fetch("/api/settings/categories?type=expense").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
         fetch("/api/settings/categories?type=income_other").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
-        fetch("/api/dokumentasi/activities").then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
       ];
 
       if (isAdmin) {
@@ -153,14 +142,13 @@ export default function PengaturanPage() {
       setExpenseCats(eCats);
       setNewTplCategory((prev) => prev || eCats[0]?.key || "");
       setIncomeCats(Array.isArray(results[4]) ? results[4] as CategoryItem[] : []);
-      setActivities(Array.isArray(results[5]) ? results[5] as Activity[] : []);
 
-      if (isAdmin && results.length > 6) {
-        const settings = results[6] as Record<string, string>;
+      if (isAdmin && results.length > 5) {
+        const settings = results[5] as Record<string, string>;
         setChurchName(settings.church_name || "");
         setPastorName(settings.pastor_name || "");
         setTreasurerName(settings.treasurer_name || "");
-        setUsers(Array.isArray(results[7]) ? results[7] as User[] : []);
+        setUsers(Array.isArray(results[6]) ? results[6] as User[] : []);
       }
     } catch {
       setLoadError(true);
@@ -261,29 +249,6 @@ export default function PengaturanPage() {
     await fetch(`/api/settings/komsel?id=${id}`, { method: "DELETE" });
     setKomselGroups((prev) => prev.filter((g) => g.id !== id));
     showSuccess("Komsel berhasil dihapus");
-  }
-
-  async function addActivity() {
-    if (!newActivityName) return;
-    const res = await fetch("/api/dokumentasi/activities", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newActivityName }),
-    });
-    const data = await res.json();
-    if (data.error) { showError(data.error); return; }
-    setNewActivityName("");
-    const list = await fetch("/api/dokumentasi/activities").then((r) => r.json());
-    setActivities(list);
-    showSuccess("Kegiatan berhasil ditambahkan");
-  }
-
-  async function deleteActivity(id: string) {
-    const result = await showConfirmDelete("Semua foto/video dan folder pada kegiatan ini akan ikut dihapus.");
-    if (!result.isConfirmed) return;
-    await fetch(`/api/dokumentasi/activities?id=${id}`, { method: "DELETE" });
-    setActivities((prev) => prev.filter((a) => a.id !== id));
-    showSuccess("Kegiatan berhasil dihapus");
   }
 
   async function addUser() {
@@ -404,13 +369,12 @@ export default function PengaturanPage() {
   }
 
   const allTabs: { key: Tab; label: string; icon: LucideIcon; roles?: string[] }[] = [
-    { key: "church", label: "Info Gereja", icon: Church, roles: ["admin"] },
+    { key: "saldo", label: "Saldo Pembuka", icon: Banknote, roles: ["admin", "bendahara"] },
     { key: "templates", label: "Template Pengeluaran", icon: FileSpreadsheet, roles: ["admin", "bendahara"] },
+    { key: "kategori", label: "Kategori Keuangan", icon: Tag, roles: ["admin"] },
     { key: "komsel", label: "Daftar Komsel", icon: Users2, roles: ["admin"] },
-    { key: "kegiatan", label: "Kegiatan", icon: Images, roles: ["admin", "dokumentasi"] },
-    { key: "kategori", label: "Kategori", icon: Tag, roles: ["admin"] },
     { key: "users", label: "Pengguna", icon: UserCog, roles: ["admin"] },
-    { key: "saldo", label: "Saldo Awal", icon: Banknote, roles: ["admin", "bendahara"] },
+    { key: "church", label: "Info Gereja", icon: Church, roles: ["admin"] },
   ];
 
   const tabs = allTabs.filter((t) => !t.roles || (role !== undefined && t.roles.includes(role)));
@@ -507,6 +471,7 @@ export default function PengaturanPage() {
           {/* Templates */}
           {activeTab === "templates" && (
             <div className="space-y-4">
+              <p className="text-sm text-gray-500">Template ini muncul sebagai pilihan cepat saat mencatat pengeluaran, sehingga tidak perlu mengisi ulang kategori dan keterangan yang sering dipakai.</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -607,33 +572,6 @@ export default function PengaturanPage() {
                   onKeyDown={(e) => e.key === "Enter" && addKomsel()}
                 />
                 <button onClick={addKomsel} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm">Tambah</button>
-              </div>
-            </div>
-          )}
-
-          {/* Kegiatan Dokumentasi */}
-          {activeTab === "kegiatan" && (
-            <div className="space-y-4 max-w-md">
-              <div className="space-y-2">
-                {activities.map((a) => (
-                  <div key={a.id} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-                    <span className="text-base">{a.name}</span>
-                    <button onClick={() => deleteActivity(a.id)} className="p-1.5 rounded-lg text-red-600 hover:bg-red-50" title="Hapus">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newActivityName}
-                  onChange={(e) => setNewActivityName(e.target.value)}
-                  placeholder="Nama Kegiatan"
-                  className="border border-gray-300 rounded-lg px-4 py-2.5 text-base flex-1"
-                  onKeyDown={(e) => e.key === "Enter" && addActivity()}
-                />
-                <button onClick={addActivity} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 text-base shadow-sm">Tambah</button>
               </div>
             </div>
           )}
@@ -842,11 +780,11 @@ export default function PengaturanPage() {
             </div>
           )}
 
-          {/* Saldo Awal */}
+          {/* Saldo Pembuka */}
           {activeTab === "saldo" && (
             <div className="space-y-4 max-w-md">
               <p className="text-base text-gray-600">
-                Saldo awal digunakan sebagai dasar perhitungan keuangan bulan pertama pencatatan.
+                Saldo pembuka digunakan sebagai dasar perhitungan keuangan bulan pertama pencatatan.
               </p>
               {firstPeriod ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700">
@@ -862,7 +800,7 @@ export default function PengaturanPage() {
               {firstPeriod && !saldoEditing ? (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Bulan Lalu (Rp)</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Pembuka (Rp)</label>
                     <div className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-base bg-gray-50 text-gray-700 font-medium">
                       {formatRupiah(firstPeriod.saldoPindahan)}
                     </div>
@@ -876,7 +814,7 @@ export default function PengaturanPage() {
                 /* Mode: belum ada periode atau sedang edit */
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Bulan Lalu (Rp)</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Saldo Pembuka (Rp)</label>
                     <NumericInput value={saldoAmount} onChange={setSaldoAmount} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base" placeholder="0" />
                   </div>
                   <div className="flex gap-2">
