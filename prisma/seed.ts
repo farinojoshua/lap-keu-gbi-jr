@@ -106,6 +106,25 @@ async function main() {
     });
   }
 
+  // Create default activities for dokumentasi
+  const defaultActivities = [
+    "Ibadah Minggu",
+    "Komsel",
+    "Baptisan",
+    "Natal",
+    "Paskah",
+    "Retreat",
+    "Pelayanan Sosial",
+    "Lainnya",
+  ];
+  for (const name of defaultActivities) {
+    await prisma.activity.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+
   console.log("Seed data created successfully!");
 }
 

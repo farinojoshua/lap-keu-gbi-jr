@@ -87,3 +87,15 @@ export async function requireAdmin(): Promise<AuthSession | NextResponse> {
   }
   return result;
 }
+
+/**
+ * Require admin or dokumentasi role. Returns session or 401/403 response.
+ */
+export async function requireDocOrAdmin(): Promise<AuthSession | NextResponse> {
+  const result = await requireAuth();
+  if (result instanceof NextResponse) return result;
+  if (result.user.role !== "admin" && result.user.role !== "dokumentasi") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return result;
+}
