@@ -95,7 +95,7 @@ export const userCreateSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter").max(50),
   password: z.string().min(6, "Password minimal 6 karakter"),
   name: z.string().min(1, "Nama wajib diisi"),
-  role: z.enum(["admin", "bendahara"]).default("bendahara"),
+  role: z.enum(["admin", "bendahara", "dokumentasi"]).default("bendahara"),
 });
 
 export const userUpdateSchema = z.object({
@@ -103,5 +103,71 @@ export const userUpdateSchema = z.object({
   username: z.string().min(3).max(50).optional(),
   password: z.string().min(6).optional(),
   name: z.string().min(1).optional(),
-  role: z.enum(["admin", "bendahara"]).optional(),
+  role: z.enum(["admin", "bendahara", "dokumentasi"]).optional(),
+});
+
+// ---------- Dokumentasi ----------
+
+export const folderCreateSchema = z.object({
+  activityId: z.string().min(1),
+  name: z.string().min(1, "Nama folder wajib diisi").max(100).transform((v) => v.trim()),
+  parentId: z.string().min(1).nullable().optional(),
+});
+
+export const folderUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100).transform((v) => v.trim()).optional(),
+});
+
+export const activityCreateSchema = z.object({
+  name: z.string().min(1, "Nama kegiatan wajib diisi").max(100).transform((v) => v.trim()),
+});
+
+export const activityUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100).transform((v) => v.trim()).optional(),
+  isActive: z.boolean().optional(),
+});
+
+const ALLOWED_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+] as const;
+
+export const uploadUrlRequestSchema = z.object({
+  activityId: z.string().min(1),
+  contentType: z.enum(ALLOWED_CONTENT_TYPES),
+  fileSize: z.number().int().min(1),
+  title: z.string().default(""),
+  folderId: z.string().min(1).optional(),
+}).refine(
+  (data) => {
+    const isVideo = data.contentType.startsWith("video/");
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 3 * 1024 * 1024;
+    return data.fileSize <= maxSize;
+  },
+  (data) => ({
+    message: data.contentType.startsWith("video/")
+      ? "Ukuran video maksimal 50MB"
+      : "Ukuran foto maksimal 3MB",
+    path: ["fileSize"],
+  })
+);
+
+export const mediaCreateSchema = z.object({
+  activityId: z.string().min(1),
+  folderId: z.string().min(1).nullable().optional(),
+  title: z.string().default(""),
+  fileType: z.enum(["image", "video"]),
+  mimeType: z.string().min(1),
+  r2Key: z.string().min(1),
+  url: z.string().url(),
+});
+
+export const mediaUpdateSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().max(200).optional(),
 });

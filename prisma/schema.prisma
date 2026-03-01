@@ -18,18 +18,17 @@ model User {
 }
 
 model Period {
-  id            String   @id @default(cuid())
-  month         Int
-  year          Int
-  saldoPindahan Int      @default(0)
-  saldoRekening Int      @default(0)
-  saldoCash     Int      @default(0)
-  isLocked      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-
-  incomeEntries  IncomeEntry[]
+  id             String         @id @default(cuid())
+  month          Int
+  year           Int
+  saldoPindahan  Int            @default(0)
+  saldoRekening  Int            @default(0)
+  saldoCash      Int            @default(0)
+  isLocked       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
   expenseEntries ExpenseEntry[]
   fundBalances   FundBalance[]
+  incomeEntries  IncomeEntry[]
 
   @@unique([month, year])
 }
@@ -44,8 +43,7 @@ model IncomeEntry {
   amount      Int
   attendance  Int?
   createdAt   DateTime @default(now())
-
-  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  period      Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
 }
 
 model ExpenseEntry {
@@ -57,8 +55,7 @@ model ExpenseEntry {
   amount      Int
   isFixed     Boolean  @default(false)
   createdAt   DateTime @default(now())
-
-  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  period      Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
 }
 
 model FixedExpenseTemplate {
@@ -75,8 +72,7 @@ model FundBalance {
   fundType String
   balance  Int    @default(0)
   note     String @default("")
-
-  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  period   Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
   @@unique([periodId, fundType])
 }
@@ -111,4 +107,41 @@ model Category {
   label String
 
   @@unique([type, key])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  folders   Folder[]
+  media     Media[]
+}
+
+model Folder {
+  id         String   @id @default(cuid())
+  name       String
+  activityId String
+  parentId   String?
+  createdAt  DateTime @default(now())
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  parent     Folder?  @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Folder[] @relation("FolderChildren")
+  media      Media[]
+}
+
+model Media {
+  id           String   @id @default(cuid())
+  activityId   String
+  folderId     String?
+  title        String   @default("")
+  fileType     String   // "image" | "video"
+  mimeType     String
+  r2Key        String   @unique
+  url          String
+  uploadedBy   String
+  uploaderName String   @default("")
+  createdAt    DateTime @default(now())
+  activity     Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  folder       Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
 }
