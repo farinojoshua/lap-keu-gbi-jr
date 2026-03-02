@@ -109,6 +109,12 @@ export default function DokumentasiPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
 
+  // Drag & drop
+  const [draggingMediaId, setDraggingMediaId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  // "root" = activity root, folder id = breadcrumb folder
+  const [dragOverBreadcrumb, setDragOverBreadcrumb] = useState<string | null>(null);
+
   // Video lightbox
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoPlaying, setVideoPlaying] = useState(false);
@@ -423,6 +429,32 @@ export default function DokumentasiPage() {
       const data = await res.json();
       showError(data.error || "Gagal menghapus media");
     }
+  }
+
+  async function handleMoveMedia(mediaId: string, targetFolderId: string | null) {
+    // Kalau lagi select mode dan item yang di-drag ada di selection, pindah semua sekaligus
+    const ids = selectMode && selected.has(mediaId) ? Array.from(selected) : [mediaId];
+
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch("/api/dokumentasi/media", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, folderId: targetFolderId }),
+        }).then((r) => r.ok)
+      )
+    );
+
+    const successCount = results.filter(Boolean).length;
+    const failCount = results.length - successCount;
+
+    if (successCount > 0) {
+      const movedIds = new Set(ids.filter((_, i) => results[i]));
+      setMedia((prev) => prev.filter((x) => !movedIds.has(x.id)));
+      if (selectMode) { setSelected(new Set()); setSelectMode(false); }
+      showSuccess(ids.length > 1 ? `${successCount} media dipindahkan` : "Media dipindahkan");
+    }
+    if (failCount > 0) showError(`${failCount} media gagal dipindahkan`);
   }
 
   async function handleBulkDelete() {
@@ -740,18 +772,64 @@ export default function DokumentasiPage() {
                 Semua
               </button>
               <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+              {/* Activity root — drop target saat sedang di dalam folder */}
               <button
                 onClick={() => navigateToBreadcrumb(-1)}
-                className={`font-medium ${folderStack.length > 0 ? "text-blue-600 hover:text-blue-800" : "text-gray-800 cursor-default"}`}
+                onDragOver={(e) => {
+                  if (!draggingMediaId || folderStack.length === 0) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverBreadcrumb("root");
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverBreadcrumb(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const mediaId = e.dataTransfer.getData("mediaId");
+                  setDragOverBreadcrumb(null);
+                  setDraggingMediaId(null);
+                  if (mediaId && folderStack.length > 0) handleMoveMedia(mediaId, null);
+                }}
+                className={`font-medium rounded px-1 -mx-1 transition-all duration-150 ${
+                  dragOverBreadcrumb === "root"
+                    ? "bg-blue-100 text-blue-800 ring-2 ring-blue-400 shadow-[0_0_10px_2px_rgba(59,130,246,0.4)] scale-105"
+                    : folderStack.length > 0
+                    ? "text-blue-600 hover:text-blue-800"
+                    : "text-gray-800 cursor-default"
+                }`}
               >
                 {selectedActivityName}
               </button>
               {folderStack.map((crumb, idx) => (
                 <span key={crumb.id} className="flex items-center gap-1">
                   <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  {/* Breadcrumb folder — drop target hanya untuk folder sebelum posisi saat ini */}
                   <button
                     onClick={() => navigateToBreadcrumb(idx)}
-                    className={`font-medium ${idx < folderStack.length - 1 ? "text-blue-600 hover:text-blue-800" : "text-gray-800 cursor-default"}`}
+                    onDragOver={(e) => {
+                      if (!draggingMediaId || idx === folderStack.length - 1) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragOverBreadcrumb(crumb.id);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverBreadcrumb(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const mediaId = e.dataTransfer.getData("mediaId");
+                      setDragOverBreadcrumb(null);
+                      setDraggingMediaId(null);
+                      if (mediaId && idx < folderStack.length - 1) handleMoveMedia(mediaId, crumb.id);
+                    }}
+                    className={`font-medium rounded px-1 -mx-1 transition-all duration-150 ${
+                      dragOverBreadcrumb === crumb.id
+                        ? "bg-blue-100 text-blue-800 ring-2 ring-blue-400 shadow-[0_0_10px_2px_rgba(59,130,246,0.4)] scale-105"
+                        : idx < folderStack.length - 1
+                        ? "text-blue-600 hover:text-blue-800"
+                        : "text-gray-800 cursor-default"
+                    }`}
                   >
                     {crumb.name}
                   </button>
@@ -804,12 +882,39 @@ export default function DokumentasiPage() {
               {folders.map((folder) => (
                 <div
                   key={folder.id}
-                  className="group relative bg-amber-50 border border-amber-200 rounded-lg overflow-hidden cursor-pointer hover:bg-amber-100 transition-colors flex flex-col items-center justify-center aspect-square p-3"
+                  className={`group relative border-2 rounded-lg overflow-hidden cursor-pointer flex flex-col items-center justify-center aspect-square p-3 transition-all duration-150 ${
+                    dragOverFolderId === folder.id
+                      ? "bg-amber-200 border-amber-500 scale-110 shadow-[0_0_20px_4px_rgba(245,158,11,0.5)]"
+                      : draggingMediaId
+                      ? "bg-amber-50 border-amber-300 border-dashed"
+                      : "bg-amber-50 border-amber-200 hover:bg-amber-100"
+                  }`}
                   onClick={() => navigateIntoFolder(folder)}
+                  onDragOver={(e) => {
+                    if (!draggingMediaId) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragOverFolderId(folder.id);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setDragOverFolderId(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const mediaId = e.dataTransfer.getData("mediaId");
+                    setDragOverFolderId(null);
+                    setDraggingMediaId(null);
+                    if (mediaId) handleMoveMedia(mediaId, folder.id);
+                  }}
                 >
-                  <FolderOpen className="w-10 h-10 text-amber-400 mb-1" />
+                  <FolderOpen className={`w-10 h-10 mb-1 transition-transform duration-150 ${dragOverFolderId === folder.id ? "text-amber-600 scale-125" : "text-amber-400"}`} />
                   <p className="text-xs font-medium text-gray-700 text-center line-clamp-2 break-all">{folder.name}</p>
-                  {canManageFolders && (
+                  {dragOverFolderId === folder.id && (
+                    <p className="text-xs text-amber-700 font-semibold mt-0.5 animate-pulse">Lepas di sini</p>
+                  )}
+                  {canManageFolders && dragOverFolderId !== folder.id && (
                     <button
                       className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 bg-white/90 rounded text-red-600 hover:text-red-800 transition-opacity"
                       onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
@@ -825,12 +930,26 @@ export default function DokumentasiPage() {
               {media.map((m, idx) => {
                 const isSelected = selected.has(m.id);
                 const isDeletable = canDelete(m);
+                const isDragging = draggingMediaId === m.id;
+                const canDrag = canUpload && (folders.length > 0 || folderStack.length > 0);
                 return (
                   <div
                     key={m.id}
-                    className={`group relative bg-gray-100 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
+                    draggable={canDrag}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("mediaId", m.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      setDraggingMediaId(m.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingMediaId(null);
+                      setDragOverFolderId(null);
+                    }}
+                    className={`group relative bg-gray-100 rounded-lg overflow-hidden border-2 cursor-pointer transition-all duration-150 ${
                       selectMode && isSelected
                         ? "border-blue-500"
+                        : isDragging
+                        ? "border-blue-400 opacity-40 scale-95 shadow-[0_0_16px_3px_rgba(59,130,246,0.5)]"
                         : "border-transparent"
                     }`}
                     onClick={() => {

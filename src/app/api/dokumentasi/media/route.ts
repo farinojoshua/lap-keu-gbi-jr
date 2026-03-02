@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireDocOrAdmin } from "@/lib/auth";
-import { mediaCreateSchema, mediaUpdateSchema } from "@/lib/validations";
+import { mediaCreateSchema, mediaUpdateSchema, mediaMoveSchema } from "@/lib/validations";
 import { deleteFromR2 } from "@/lib/r2";
 import { logError } from "@/lib/logger";
 import { auditLog } from "@/lib/audit";
@@ -95,14 +95,53 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const { role, id: userId } = auth.user;
+
+    // Move media to folder
+    if ("folderId" in body) {
+      const data = mediaMoveSchema.parse(body);
+
+      const media = await prisma.media.findUnique({ where: { id: data.id } });
+      if (!media) {
+        return NextResponse.json({ error: "Media tidak ditemukan" }, { status: 404 });
+      }
+      if (role === "dokumentasi" && media.uploadedBy !== userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      // Verify folder belongs to same activity (if folderId not null)
+      if (data.folderId) {
+        const folder = await prisma.folder.findUnique({ where: { id: data.folderId } });
+        if (!folder || folder.activityId !== media.activityId) {
+          return NextResponse.json({ error: "Folder tidak valid" }, { status: 400 });
+        }
+      }
+
+      const updated = await prisma.media.update({
+        where: { id: data.id },
+        data: { folderId: data.folderId },
+        include: { activity: { select: { name: true } } },
+      });
+
+      await auditLog({
+        userId: auth.user.id,
+        userName: auth.user.name,
+        action: "UPDATE",
+        entity: "Media",
+        entityId: updated.id,
+        details: `Moved to folder: ${data.folderId ?? "root"}`,
+      });
+
+      return NextResponse.json(updated);
+    }
+
+    // Update title
     const data = mediaUpdateSchema.parse(body);
 
     const media = await prisma.media.findUnique({ where: { id: data.id } });
     if (!media) {
       return NextResponse.json({ error: "Media tidak ditemukan" }, { status: 404 });
     }
-
-    const { role, id: userId } = auth.user;
     if (role === "dokumentasi" && media.uploadedBy !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -128,7 +167,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
     }
     logError("PUT /api/dokumentasi/media", err);
-    return NextResponse.json({ error: "Gagal menyimpan judul" }, { status: 500 });
+    return NextResponse.json({ error: "Gagal menyimpan" }, { status: 500 });
   }
 }
 
