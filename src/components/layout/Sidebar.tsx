@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
+  Home,
   LayoutDashboard,
   TrendingUp,
   TrendingDown,
@@ -27,9 +28,15 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
+    group: "Utama",
+    items: [
+      { href: "/", label: "Beranda", icon: Home },
+    ],
+  },
+  {
     group: "Keuangan",
     items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "bendahara"] },
+      { href: "/keuangan", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "bendahara"] },
       { href: "/pemasukan", label: "Pemasukan", icon: TrendingUp, roles: ["admin", "bendahara"] },
       { href: "/pengeluaran", label: "Pengeluaran", icon: TrendingDown, roles: ["admin", "bendahara"] },
       { href: "/laporan", label: "Laporan", icon: FileText, roles: ["admin", "bendahara"] },
@@ -106,7 +113,7 @@ export default function Sidebar({
                   const isActive =
                     item.href === "/"
                       ? pathname === "/"
-                      : pathname.startsWith(item.href);
+                      : pathname === item.href || pathname.startsWith(item.href + "/");
                   const Icon = item.icon;
                   return (
                     <Link

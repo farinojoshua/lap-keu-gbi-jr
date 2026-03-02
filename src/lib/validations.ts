@@ -143,19 +143,19 @@ export const uploadUrlRequestSchema = z.object({
   fileSize: z.number().int().min(1),
   title: z.string().default(""),
   folderId: z.string().min(1).optional(),
-}).refine(
-  (data) => {
-    const isVideo = data.contentType.startsWith("video/");
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 3 * 1024 * 1024;
-    return data.fileSize <= maxSize;
-  },
-  (data) => ({
-    message: data.contentType.startsWith("video/")
-      ? "Ukuran video maksimal 50MB"
-      : "Ukuran foto maksimal 3MB",
-    path: ["fileSize"],
-  })
-);
+}).superRefine((data, ctx) => {
+  const isVideo = data.contentType.startsWith("video/");
+  const maxSize = isVideo ? 50 * 1024 * 1024 : 3 * 1024 * 1024;
+  if (data.fileSize > maxSize) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: isVideo
+        ? "Ukuran video maksimal 50MB"
+        : "Ukuran foto maksimal 3MB",
+      path: ["fileSize"],
+    });
+  }
+});
 
 export const mediaCreateSchema = z.object({
   activityId: z.string().min(1),
@@ -170,4 +170,9 @@ export const mediaCreateSchema = z.object({
 export const mediaUpdateSchema = z.object({
   id: z.string().min(1),
   title: z.string().max(200).optional(),
+});
+
+export const mediaMoveSchema = z.object({
+  id: z.string().min(1),
+  folderId: z.string().min(1).nullable(),
 });

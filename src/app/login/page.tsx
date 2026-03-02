@@ -38,7 +38,7 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo_gbi.png" alt="Logo GBI" width={80} height={80} className="mx-auto mb-4 rounded-full" />
           <h1 className="text-3xl font-bold text-gray-800">GBI Jonggol Raya</h1>
-          <p className="text-gray-500 mt-2">Sistem Laporan Keuangan</p>
+          <p className="text-gray-500 mt-2">Portal Gereja</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
