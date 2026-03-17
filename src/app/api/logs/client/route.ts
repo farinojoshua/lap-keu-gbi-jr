@@ -9,7 +9,7 @@ const ClientLogSchema = z.object({
   path: z.string().optional(),
   userAgent: z.string().optional(),
   stack: z.string().optional(),
-  meta: z.record(z.any()).optional(),
+  meta: z.record(z.string(), z.any()).optional(),
 });
 
 export async function POST(req: NextRequest) {
