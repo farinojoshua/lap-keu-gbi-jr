@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
 import AppLayout from "@/components/layout/AppLayout";
+import ClientLogBridge from "@/components/providers/ClientLogBridge";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="id">
       <body className={`${inter.className} antialiased`}>
         <SessionProvider>
+          <ClientLogBridge />
           <AppLayout>{children}</AppLayout>
         </SessionProvider>
       </body>
