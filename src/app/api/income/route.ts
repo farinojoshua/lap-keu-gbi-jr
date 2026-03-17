@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { incomeEntrySchema, incomeUpdateSchema } from "@/lib/validations";
-import { logError } from "@/lib/logger";
+import { logError, logInfo } from "@/lib/logger";
 import { auditLog } from "@/lib/audit";
 
 const LOCKED_MSG = "Periode sudah ditutup, data tidak bisa diubah";
@@ -65,6 +65,12 @@ export async function POST(req: NextRequest) {
           details: `${entry.category} - Rp ${entry.amount}`,
         });
       }
+      logInfo("income_batch_created", {
+        route: "/api/income",
+        method: "POST",
+        count: entries.length,
+        userId: auth.user.id,
+      });
       return NextResponse.json(entries);
     }
 
@@ -80,6 +86,14 @@ export async function POST(req: NextRequest) {
       entity: "IncomeEntry",
       entityId: entry.id,
       details: `${validated.category} - Rp ${validated.amount}`,
+    });
+    logInfo("income_created", {
+      route: "/api/income",
+      method: "POST",
+      entryId: entry.id,
+      category: entry.category,
+      amount: entry.amount,
+      userId: auth.user.id,
     });
     return NextResponse.json(entry);
   } catch (err) {
@@ -121,6 +135,12 @@ export async function PUT(req: NextRequest) {
       entityId: id,
       details: `Updated income entry`,
     });
+    logInfo("income_updated", {
+      route: "/api/income",
+      method: "PUT",
+      entryId: id,
+      userId: auth.user.id,
+    });
 
     return NextResponse.json(entry);
   } catch (err) {
@@ -160,6 +180,12 @@ export async function DELETE(req: NextRequest) {
       action: "DELETE",
       entity: "IncomeEntry",
       entityId: id,
+    });
+    logInfo("income_deleted", {
+      route: "/api/income",
+      method: "DELETE",
+      entryId: id,
+      userId: auth.user.id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
