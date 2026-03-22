@@ -145,13 +145,13 @@ export const uploadUrlRequestSchema = z.object({
   folderId: z.string().min(1).optional(),
 }).superRefine((data, ctx) => {
   const isVideo = data.contentType.startsWith("video/");
-  const maxSize = isVideo ? 50 * 1024 * 1024 : 3 * 1024 * 1024;
+  const maxSize = isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
   if (data.fileSize > maxSize) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: isVideo
-        ? "Ukuran video maksimal 50MB"
-        : "Ukuran foto maksimal 3MB",
+        ? "Ukuran video maksimal 100MB"
+        : "Ukuran foto maksimal 25MB",
       path: ["fileSize"],
     });
   }

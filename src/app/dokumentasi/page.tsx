@@ -332,9 +332,9 @@ export default function DokumentasiPage() {
     const validFiles: File[] = [];
     for (const file of Array.from(files)) {
       const isVideo = file.type.startsWith("video/");
-      const maxSize = isVideo ? 50 * 1024 * 1024 : 3 * 1024 * 1024;
+      const maxSize = isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
       if (file.size > maxSize) {
-        showError(`"${file.name}" terlalu besar. Maks ${isVideo ? "50MB untuk video" : "3MB untuk foto"}.`);
+        showError(`"${file.name}" terlalu besar. Maks ${isVideo ? "100MB untuk video" : "25MB untuk foto"}.`);
       } else {
         validFiles.push(file);
       }
