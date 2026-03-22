@@ -9,12 +9,13 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  password  String
-  name      String
-  role      String   @default("bendahara")
-  createdAt DateTime @default(now())
+  id         String      @id @default(cuid())
+  username   String      @unique
+  password   String
+  name       String
+  role       String      @default("bendahara")
+  createdAt  DateTime    @default(now())
+  shareLinks ShareLink[]
 }
 
 model Period {
@@ -110,38 +111,56 @@ model Category {
 }
 
 model Activity {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  folders   Folder[]
-  media     Media[]
+  id         String      @id @default(cuid())
+  name       String      @unique
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  folders    Folder[]
+  media      Media[]
+  shareLinks ShareLink[]
 }
 
 model Folder {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   name       String
   activityId String
   parentId   String?
-  createdAt  DateTime @default(now())
-  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  parent     Folder?  @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children   Folder[] @relation("FolderChildren")
+  createdAt  DateTime    @default(now())
+  activity   Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  parent     Folder?     @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Folder[]    @relation("FolderChildren")
   media      Media[]
+  shareLinks ShareLink[]
 }
 
 model Media {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   activityId   String
   folderId     String?
-  title        String   @default("")
-  fileType     String   // "image" | "video"
+  title        String      @default("")
+  fileType     String      // "image" | "video"
   mimeType     String
-  r2Key        String   @unique
+  r2Key        String      @unique
   url          String
   uploadedBy   String
-  uploaderName String   @default("")
-  createdAt    DateTime @default(now())
-  activity     Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  folder       Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploaderName String      @default("")
+  createdAt    DateTime    @default(now())
+  activity     Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  folder       Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  shareLinks   ShareLink[]
+}
+
+model ShareLink {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  type       String    // "activity" | "folder" | "media"
+  activityId String?
+  folderId   String?
+  mediaId    String?
+  createdBy  String
+  createdAt  DateTime  @default(now())
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  folder     Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  media      Media?    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [createdBy], references: [id])
 }

@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { showConfirmDelete, showConfirmAction, showError, showSuccess } from "@/lib/swal";
 import {
   Upload, Trash2, Download, X, ChevronLeft, ChevronRight, Images,
-  CheckSquare, Square, Play, Pencil, Check, FolderOpen, FolderPlus, Plus,
+  CheckSquare, Square, Play, Pencil, Check, FolderOpen, FolderPlus, Plus, Share2, Copy, CheckCheck,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -124,6 +124,10 @@ export default function DokumentasiPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Share modal
+  const [shareModal, setShareModal] = useState<{ url: string; loading: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -414,6 +418,30 @@ export default function DokumentasiPage() {
     if (failCount > 0) {
       showError(`${failCount} file gagal diupload`);
     }
+  }
+
+  async function handleShare(type: "activity" | "folder" | "media", targetId: string) {
+    setShareModal({ url: "", loading: true });
+    try {
+      const res = await fetch("/api/dokumentasi/share-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, targetId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setShareModal(null); showError(data.error || "Gagal membuat link"); return; }
+      setShareModal({ url: data.url, loading: false });
+    } catch {
+      setShareModal(null);
+      showError("Gagal membuat link");
+    }
+  }
+
+  function copyShareLink(url: string) {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   async function handleDelete(m: MediaItem) {
@@ -838,7 +866,7 @@ export default function DokumentasiPage() {
           )}
 
           {/* Filter bar */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
             <label className="text-sm text-gray-600 whitespace-nowrap">Filter bulan:</label>
             <input
               type="month"
@@ -852,6 +880,18 @@ export default function DokumentasiPage() {
                 className="text-sm text-gray-500 hover:text-gray-700"
               >
                 Reset
+              </button>
+            )}
+            {selectedActivity && (
+              <button
+                onClick={() => {
+                  if (currentFolderId) handleShare("folder", currentFolderId);
+                  else handleShare("activity", selectedActivity);
+                }}
+                className="ml-auto flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded-lg px-3 py-2 transition-colors"
+              >
+                <Share2 className="w-4 h-4" />
+                Bagikan {currentFolderId ? "Folder" : "Kegiatan"}
               </button>
             )}
           </div>
@@ -1165,6 +1205,44 @@ export default function DokumentasiPage() {
               <ChevronRight className="w-8 h-8" />
             </button>
           )}
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {shareModal !== null && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShareModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-blue-600" />
+                <h2 className="text-base font-semibold text-gray-900">Bagikan Link</h2>
+              </div>
+              <button onClick={() => setShareModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {shareModal.loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 mb-3">Siapapun yang memiliki link ini dapat melihat konten tanpa perlu login.</p>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                  <p className="flex-1 text-sm text-gray-700 truncate">{shareModal.url}</p>
+                  <button
+                    onClick={() => copyShareLink(shareModal.url)}
+                    className={`shrink-0 flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                      copied ? "bg-green-100 text-green-700" : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    {copied ? <><CheckCheck className="w-4 h-4" /> Disalin!</> : <><Copy className="w-4 h-4" /> Salin</>}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

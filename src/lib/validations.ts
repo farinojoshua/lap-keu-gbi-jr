@@ -176,3 +176,8 @@ export const mediaMoveSchema = z.object({
   id: z.string().min(1),
   folderId: z.string().min(1).nullable(),
 });
+
+export const shareLinkCreateSchema = z.object({
+  type: z.enum(["activity", "folder", "media"]),
+  targetId: z.string().min(1),
+});

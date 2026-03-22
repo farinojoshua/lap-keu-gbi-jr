@@ -9,8 +9,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
 
-  // Don't show layout on login page
-  if (pathname === "/login") {
+  // Don't show layout on login and public share pages
+  if (pathname === "/login" || pathname.startsWith("/share")) {
     return <>{children}</>;
   }
 
