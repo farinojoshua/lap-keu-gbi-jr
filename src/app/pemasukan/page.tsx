@@ -272,7 +272,7 @@ export default function PemasukanPage() {
       if (sortKey === "date") return a.date.localeCompare(b.date) * mul;
       return (a.amount - b.amount) * mul;
     });
-  }, [entries, searchQuery, sortKey, sortDir]);
+  }, [entries, otherCats, searchQuery, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {

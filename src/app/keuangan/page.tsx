@@ -120,8 +120,6 @@ export default function DashboardPage() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
-    setError(false);
     fetch(`/api/dashboard?month=${month}&year=${year}`)
       .then((r) => {
         if (!r.ok) throw new Error();
@@ -249,7 +247,11 @@ export default function DashboardPage() {
         <div className="flex gap-2 flex-wrap items-center">
           <select
             value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
+            onChange={(e) => {
+              setLoading(true);
+              setError(false);
+              setMonth(Number(e.target.value));
+            }}
             className="border border-gray-300 rounded-lg px-4 py-2.5 text-base"
           >
             {Array.from({ length: 12 }, (_, i) => (
@@ -258,7 +260,11 @@ export default function DashboardPage() {
           </select>
           <select
             value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
+            onChange={(e) => {
+              setLoading(true);
+              setError(false);
+              setYear(Number(e.target.value));
+            }}
             className="border border-gray-300 rounded-lg px-4 py-2.5 text-base"
           >
             {generateYears().map((y) => (

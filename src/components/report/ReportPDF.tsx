@@ -113,6 +113,8 @@ export default function ReportPDF({ data, logoUrl }: { data: ReportData; logoUrl
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
+          {/* jsx-a11y false-positive for @react-pdf/renderer Image */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           {logoUrl && <Image src={logoUrl} style={styles.logo} />}
           <Text style={styles.title}>LAPORAN KEUANGAN</Text>
           <Text style={styles.subtitle}>

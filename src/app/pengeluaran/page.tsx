@@ -269,7 +269,7 @@ export default function PengeluaranPage() {
       if (sortKey === "date") return a.date.localeCompare(b.date) * mul;
       return (a.amount - b.amount) * mul;
     });
-  }, [entries, searchQuery, sortKey, sortDir]);
+  }, [entries, expenseCats, searchQuery, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {

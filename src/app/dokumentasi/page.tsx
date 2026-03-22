@@ -139,7 +139,6 @@ export default function DokumentasiPage() {
     setSelected(new Set());
     setCreatingFolder(false);
     setNewFolderName("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedActivity]);
 
   useEffect(() => {
